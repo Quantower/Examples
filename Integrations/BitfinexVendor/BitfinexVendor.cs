@@ -11,6 +11,10 @@ using TradingPlatform.BusinessLayer.Utils;
 
 namespace BitfinexVendor
 {
+    /// <summary>
+    /// An example of integration with for Quantower trading platform
+    /// Bitfinex crypto exchange
+    /// </summary>
     public class BitfinexVendor : Vendor
     {
         #region Properties
@@ -43,15 +47,28 @@ namespace BitfinexVendor
         }
 
         #region Integration details
+
+        /// <summary>
+        /// Use GetVendorMetaData method to provide general information about integration such s name, description, registration link, etc
+        /// </summary>        
         public override VendorMetaData GetVendorMetaData() => new VendorMetaData
         {
             VendorName = BitfinexConsts.VENDOR_NAME,
             VendorDescription = "Market data connection. Trading coming soon."
         };
+
         #endregion Integration detailss
 
         #region Connection
 
+        public override IList<ConnectionInfo> GetDefaultConnections() => new List<ConnectionInfo>
+        {
+            this.CreateDefaultConnectionInfo("Bitfinex", BitfinexConsts.VENDOR_NAME, "BitfinexVendor\\bitfinex.svg", allowCreateCustomConnections: false)
+        };
+
+        /// <summary>
+        /// Called when user decides to connect to this particular integration via Connections Screen
+        /// </summary>        
         public override ConnectionResult Connect(ConnectRequestParameters connectRequestParameters)
         {
             if (!NetworkInterface.GetIsNetworkAvailable())
@@ -69,6 +86,9 @@ namespace BitfinexVendor
             return ConnectionResult.CreateSuccess();
         }
 
+        /// <summary>
+        /// Called when user disconnects from integration
+        /// </summary>
         public override void Disconnect()
         {
             this.socketApi.Disconnect();
@@ -78,6 +98,9 @@ namespace BitfinexVendor
             this.aggressorFlagCalculator.Dispose();
         }
 
+        /// <summary>
+        /// Method Ping called periodically by trading platform to analyse current speed of communication with server
+        /// </summary>        
         public override PingResult Ping()
         {
             var result = new PingResult
@@ -110,7 +133,11 @@ namespace BitfinexVendor
 
         #endregion Connection
 
-        #region Symbols and symbol groups         
+        #region Symbols and symbol groups       
+
+        /// <summary>
+        /// Provides a information about available Symbols into the trading platform
+        /// </summary>        
         public override IList<MessageSymbol> GetSymbols()
         {
             List<MessageSymbol> result = new List<MessageSymbol>();
@@ -131,11 +158,17 @@ namespace BitfinexVendor
             return result;
         }
 
+        /// <summary>
+        /// Provides a information about available Symbols Types into the trading platform
+        /// </summary>        
         public override MessageSymbolTypes GetSymbolTypes() => new MessageSymbolTypes()
         {
             SymbolTypes = new List<SymbolType> { SymbolType.Crypto }
         };
 
+        /// <summary>
+        /// Provides a information about available Assets into the trading platform
+        /// </summary>        
         public override IList<MessageAsset> GetAssets()
         {
             List<MessageAsset> result = new List<MessageAsset>();
@@ -160,6 +193,9 @@ namespace BitfinexVendor
             return result;
         }
 
+        /// <summary>
+        /// Provides a information about available Exchanges into the trading platform
+        /// </summary>        
         public override IList<MessageExchange> GetExchanges()
         {
             IList<MessageExchange> exchanges = new List<MessageExchange>
@@ -173,9 +209,14 @@ namespace BitfinexVendor
 
             return exchanges;
         }
+
         #endregion Symbols and symbol groups
 
         #region Accounts and rules
+
+        /// <summary>
+        /// Provides a information about available Rules into the trading platform
+        /// </summary> 
         public override IList<MessageRule> GetRules()
         {
             var rules = base.GetRules();
@@ -191,6 +232,10 @@ namespace BitfinexVendor
         #endregion Accounts and rules
 
         #region Subscriptions
+
+        /// <summary>
+        /// Called when the trading platform required subscription for quotes: level1, level2 or trades
+        /// </summary>        
         public override void SubscribeSymbol(SubscribeQuotesParameters parameters)
         {
             switch (parameters.SubscribeType)
@@ -207,6 +252,9 @@ namespace BitfinexVendor
             }
         }
 
+        /// <summary>
+        /// Called when the trading platform required unsubscription from quotes: level1, level2 or trades
+        /// </summary>        
         public override void UnSubscribeSymbol(SubscribeQuotesParameters parameters)
         {
             switch (parameters.SubscribeType)
@@ -222,9 +270,14 @@ namespace BitfinexVendor
                     return;
             }
         }
+
         #endregion Subscriptions
 
         #region History
+
+        /// <summary>
+        /// Provides an information about available history in this integration
+        /// </summary>        
         public override HistoryMetadata GetHistoryMetadata() => new HistoryMetadata()
         {
             AllowedHistoryTypes = new HistoryType[] { HistoryType.Last },
@@ -247,6 +300,9 @@ namespace BitfinexVendor
             }
         };
 
+        /// <summary>
+        /// Called when user requests history in the trading platform
+        /// </summary>        
         public override IList<IHistoryItem> LoadHistory(HistoryRequestParameters requestParameters)
         {
             List<IHistoryItem> result = new List<IHistoryItem>();
@@ -551,7 +607,6 @@ namespace BitfinexVendor
                     return "1M";
             }
         }
-        #endregion Misc
 
         private void SocketApi_NewData(object sender, BitfinexEventArgs e)
         {
@@ -596,5 +651,7 @@ namespace BitfinexVendor
                 }
             }
         }
+
+        #endregion Misc
     }
 }

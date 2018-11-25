@@ -25,13 +25,19 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="Bitfinex.svg" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="bitfinex.svg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="WebSocket4Net" Version="0.15.2" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="TradingPlatform.BusinessLayer">
-      <HintPath>..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.27.1\bin\TradingPlatform.BusinessLayer.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\..\BusinessLayer\TradingPlatform.BusinessLayer\TradingPlatform.BusinessLayer.csproj" />
   </ItemGroup>
 
 </Project>
