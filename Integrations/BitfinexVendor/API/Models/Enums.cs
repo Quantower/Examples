@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
 

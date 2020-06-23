@@ -1,10 +1,13 @@
-﻿using BitfinexVendor.API;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using BitfinexVendor.API;
 using BitfinexVendor.API.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Threading;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 using TradingPlatform.BusinessLayer.Utils;
@@ -18,6 +21,8 @@ namespace BitfinexVendor
     public class BitfinexVendor : Vendor
     {
         #region Properties
+        public event Action<Message> NewMessage;
+
         private readonly BitfinexRestApi restApi;
         private readonly BitfinexSocketApi socketApi;
 
@@ -54,7 +59,7 @@ namespace BitfinexVendor
         public override VendorMetaData GetVendorMetaData() => new VendorMetaData
         {
             VendorName = BitfinexConsts.VENDOR_NAME,
-            VendorDescription = "Market data connection. Trading coming soon."
+            VendorDescription = loc.key("Market data connection. Trading coming soon.")
         };
 
         #endregion Integration detailss
@@ -72,12 +77,12 @@ namespace BitfinexVendor
         public override ConnectionResult Connect(ConnectRequestParameters connectRequestParameters)
         {
             if (!NetworkInterface.GetIsNetworkAvailable())
-                return ConnectionResult.CreateFail("Network does not available");
+                return ConnectionResult.CreateFail(loc._("Network does not available"));
 
             this.socketApi.Connect();
 
             if (this.socketApi.ConnectionState != BitfinexConnectionState.Connected)
-                return ConnectionResult.CreateFail("Can't connect via socket");
+                return ConnectionResult.CreateFail(loc._("Can't connect via socket"));
 
             var symbols = this.restApi.GetSymbolsDetails().Result;
             foreach (var symbol in symbols)
@@ -138,7 +143,7 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Symbols into the trading platform
         /// </summary>        
-        public override IList<MessageSymbol> GetSymbols()
+        public override IList<MessageSymbol> GetSymbols(CancellationToken token)
         {
             List<MessageSymbol> result = new List<MessageSymbol>();
 
@@ -146,7 +151,7 @@ namespace BitfinexVendor
             {
                 var bitfinexSymbol = item.Value;
 
-                if (bitfinexSymbol.Pair.Length != 6)
+                if (bitfinexSymbol.Pair.Length != 6 && bitfinexSymbol.Pair.IndexOf(BitfinexConsts.SYMBOL_SEPARATOR, StringComparison.Ordinal) < 0)
                     continue;
 
                 var messageSymbol = CreateMessageSymbol(bitfinexSymbol);
@@ -161,7 +166,7 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Symbols Types into the trading platform
         /// </summary>        
-        public override MessageSymbolTypes GetSymbolTypes() => new MessageSymbolTypes()
+        public override MessageSymbolTypes GetSymbolTypes(CancellationToken token) => new MessageSymbolTypes()
         {
             SymbolTypes = new List<SymbolType> { SymbolType.Crypto }
         };
@@ -169,7 +174,7 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Assets into the trading platform
         /// </summary>        
-        public override IList<MessageAsset> GetAssets()
+        public override IList<MessageAsset> GetAssets(CancellationToken token)
         {
             List<MessageAsset> result = new List<MessageAsset>();
 
@@ -177,17 +182,29 @@ namespace BitfinexVendor
             {
                 var bitfinexSymbol = item.Value;
 
-                if (bitfinexSymbol.Pair.Length != 6)
+                if (bitfinexSymbol.Pair.Length == 6)
                 {
-                    Core.Instance.Loggers.Log($"{BitfinexConsts.VENDOR_NAME}. Can't create assets for symbol {bitfinexSymbol.Pair}");
-                    continue;
+                    var message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(0, 3));
+                    result.Add(message);
+
+                    message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(3, 3));
+                    result.Add(message);
                 }
+                else
+                {
+                    int separatorIndex = bitfinexSymbol.Pair.IndexOf(BitfinexConsts.SYMBOL_SEPARATOR, StringComparison.Ordinal);
 
-                var message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(0, 3));
-                result.Add(message);
+                    if (separatorIndex > 0)
+                    {
+                        var message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(0, separatorIndex));
+                        result.Add(message);
 
-                message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(3, 3));
-                result.Add(message);
+                        message = CreateMessageAsset(bitfinexSymbol.Pair.Substring(separatorIndex + 1, bitfinexSymbol.Pair.Length - separatorIndex - 1));
+                        result.Add(message);
+                    }
+                    else
+                        Core.Instance.Loggers.Log($"{BitfinexConsts.VENDOR_NAME}. Can't create assets for symbol {bitfinexSymbol.Pair}");
+                }
             }
 
             return result;
@@ -196,7 +213,7 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Exchanges into the trading platform
         /// </summary>        
-        public override IList<MessageExchange> GetExchanges()
+        public override IList<MessageExchange> GetExchanges(CancellationToken token)
         {
             IList<MessageExchange> exchanges = new List<MessageExchange>
             {
@@ -217,9 +234,9 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Rules into the trading platform
         /// </summary> 
-        public override IList<MessageRule> GetRules()
+        public override IList<MessageRule> GetRules(CancellationToken token)
         {
-            var rules = base.GetRules();
+            var rules = base.GetRules(token);
 
             rules.Add(new MessageRule
             {
@@ -278,7 +295,7 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides an information about available history in this integration
         /// </summary>        
-        public override HistoryMetadata GetHistoryMetadata() => new HistoryMetadata()
+        public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken) => new HistoryMetadata()
         {
             AllowedHistoryTypes = new HistoryType[] { HistoryType.Last },
             DownloadingStep_Tick = TimeSpan.FromDays(10),
@@ -307,6 +324,8 @@ namespace BitfinexVendor
         {
             List<IHistoryItem> result = new List<IHistoryItem>();
 
+            string symbol = requestParameters.SymbolId;
+
             long fromUnix = Core.Instance.TimeUtils.ConvertDateTimeToUnixMiliseconds(requestParameters.FromTime);
             long toUnix = Core.Instance.TimeUtils.ConvertDateTimeToUnixMiliseconds(requestParameters.ToTime);
 
@@ -320,7 +339,7 @@ namespace BitfinexVendor
 
                     while (fromUnix < currentToUnix)
                     {
-                        var trades = this.restApi.GetTrades(requestParameters.Symbol.Id, fromUnix, currentToUnix).Result;
+                        var trades = this.restApi.GetTrades(symbol, fromUnix, currentToUnix).Result;
 
                         if (trades.Length == 0)
                             break;
@@ -346,7 +365,7 @@ namespace BitfinexVendor
 
                     while (fromUnix < currentToUnix)
                     {
-                        var candles = this.restApi.GetCandles(requestParameters.Symbol.Id, timeFrame, fromUnix, currentToUnix).Result;
+                        var candles = this.restApi.GetCandles(symbol, timeFrame, fromUnix, currentToUnix).Result;
 
                         if (candles.Length == 0)
                             break;
@@ -408,6 +427,7 @@ namespace BitfinexVendor
                 AllowCalculateRealtimeVolume = false,
                 AllowCalculateRealtimeTrades = false,
                 AllowCalculateRealtimeTicks = false,
+                AllowAbbreviatePriceByTickSize = true,
                 Description = $"{baseAsset} vs {quoteAsset}",
                 ExchangeId = BitfinexConsts.EXCHANGE_ID,
                 HistoryType = HistoryType.Last,
@@ -429,13 +449,13 @@ namespace BitfinexVendor
                 }
             };
 
-            message.SymbolAdditionalInfo = new List<SymbolAdditionalInfoItem>
+            message.SymbolAdditionalInfo = new List<AdditionalInfoItem>
             {
-                new SymbolAdditionalInfoItem
+                new AdditionalInfoItem
                 {
                     GroupInfo = BitfinexConsts.TRADING_INFO_GROUP,
                     SortIndex = 100,
-                    APIKey = "Allow margin trading",
+                    Id = "Allow margin trading",
                     NameKey = loc.key("Allow margin trading"),
                     ToolTipKey = loc.key("Allow margin trading"),
                     DataType = ComparingType.String,
@@ -446,11 +466,11 @@ namespace BitfinexVendor
 
             if (bitfinexSymbol.AllowMargin)
             {
-                message.SymbolAdditionalInfo.Add(new SymbolAdditionalInfoItem
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = BitfinexConsts.TRADING_INFO_GROUP,
                     SortIndex = 110,
-                    APIKey = "Initial margin",
+                    Id = "Initial margin",
                     NameKey = loc.key("Initial margin"),
                     ToolTipKey = loc.key("Initial margin"),
                     DataType = ComparingType.Double,
@@ -458,11 +478,11 @@ namespace BitfinexVendor
                     Hidden = false
                 });
 
-                message.SymbolAdditionalInfo.Add(new SymbolAdditionalInfoItem
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = BitfinexConsts.TRADING_INFO_GROUP,
                     SortIndex = 120,
-                    APIKey = "Minimum margin",
+                    Id = "Minimum margin",
                     NameKey = loc.key("Minimum margin"),
                     ToolTipKey = loc.key("Minimum margin"),
                     DataType = ComparingType.Double,
@@ -575,6 +595,14 @@ namespace BitfinexVendor
         #endregion Factory
 
         #region Misc
+
+        private new void PushMessage(Message message)
+        {
+            this.NewMessage?.Invoke(message);
+
+            base.PushMessage(message);
+        }
+
         private string GetTimeFrameFromPeriod(Period period)
         {
             long ticks = period.Ticks;

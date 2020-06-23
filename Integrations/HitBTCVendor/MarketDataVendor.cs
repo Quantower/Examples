@@ -1,10 +1,13 @@
-﻿using HitBTC.Net;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using HitBTC.Net;
 using HitBTC.Net.Communication;
 using HitBTC.Net.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Threading;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 using TradingPlatform.BusinessLayer.Utils;
@@ -16,6 +19,8 @@ namespace HitBTCVendor
         #region Consts
         private const int EXCHANGE_ID = 1;
         private const string TRADING_INFO_GROUP = "#20.Trading info";
+
+        private const int MAX_TRADES_BY_REQUEST = 1000;
         #endregion Consts
 
         #region Properties
@@ -26,7 +31,7 @@ namespace HitBTCVendor
 
         public event Action<Message> NewMessage;
 
-        private Dictionary<string, HitCurrency> currenciesCache;
+        protected Dictionary<string, HitCurrency> currenciesCache;
         protected Dictionary<string, HitSymbol> symbolsCache;
 
         private Ping ping;
@@ -149,7 +154,7 @@ namespace HitBTCVendor
         #endregion Connection
 
         #region Symbols and symbol groups         
-        public override IList<MessageSymbol> GetSymbols()
+        public override IList<MessageSymbol> GetSymbols(CancellationToken token)
         {
             List<MessageSymbol> result = new List<MessageSymbol>();
 
@@ -162,15 +167,22 @@ namespace HitBTCVendor
                 this.lastsTimeCache.Add(item.Key, 0);
             }
 
+            var btcusd = result.FirstOrDefault(m => m.Name == "BTCUSD");
+            if (btcusd != null)
+            {
+                result.Remove(btcusd);
+                result.Insert(0, btcusd);
+            }
+
             return result;
         }
 
-        public override MessageSymbolTypes GetSymbolTypes() => new MessageSymbolTypes()
+        public override MessageSymbolTypes GetSymbolTypes(CancellationToken token) => new MessageSymbolTypes()
         {
             SymbolTypes = new List<SymbolType> { SymbolType.Crypto }
         };
 
-        public override IList<MessageAsset> GetAssets()
+        public override IList<MessageAsset> GetAssets(CancellationToken token)
         {
             List<MessageAsset> result = new List<MessageAsset>();
 
@@ -184,7 +196,7 @@ namespace HitBTCVendor
             return result;
         }
 
-        public override IList<MessageExchange> GetExchanges()
+        public override IList<MessageExchange> GetExchanges(CancellationToken token)
         {
             IList<MessageExchange> exchanges = new List<MessageExchange>
             {
@@ -200,9 +212,9 @@ namespace HitBTCVendor
         #endregion
 
         #region Accounts and rules
-        public override IList<MessageRule> GetRules()
+        public override IList<MessageRule> GetRules(CancellationToken token)
         {
-            var rules = base.GetRules();
+            var rules = base.GetRules(token);
 
             rules.Add(new MessageRule
             {
@@ -249,7 +261,7 @@ namespace HitBTCVendor
         #endregion Subscriptions
 
         #region History
-        public override HistoryMetadata GetHistoryMetadata() => new HistoryMetadata()
+        public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken) => new HistoryMetadata()
         {
             AllowedHistoryTypes = new HistoryType[] { HistoryType.Last },
             DownloadingStep_Tick = TimeSpan.FromDays(1),
@@ -284,22 +296,30 @@ namespace HitBTCVendor
 
                 while (from < to)
                 {
-                    var trades = this.CheckHitResponse(this.restApi.GetTradesByTimestampAsync(symbol, HitSort.Asc, from, to, 1000, cancellationToken: token).Result, out HitError hitError, true);
+                    var trades = this.CheckHitResponse(this.restApi.GetTradesByTimestampAsync(symbol, HitSort.Asc, from, to, MAX_TRADES_BY_REQUEST, cancellationToken: token).Result, out HitError hitError, true);
 
-                    if (hitError != null || trades.Length == 0 || token.IsCancellationRequested)
+                    if (hitError != null || token.IsCancellationRequested)
                         break;
 
                     hitTrades.AddRange(trades);
 
-                    from = trades.Last().Timestamp.AddSeconds(1);
+                    if (trades.Length < MAX_TRADES_BY_REQUEST)
+                        break;
+
+                    from = trades.Last().Timestamp;
                 }
 
-
                 long prevTimeTicks = 0;
+                long prevTradeId = 0;
                 foreach (var hitTrade in hitTrades)
                 {
                     if (token.IsCancellationRequested)
                         break;
+
+                    if (hitTrade.Id <= prevTradeId)
+                        continue;
+
+                    prevTradeId = hitTrade.Id;
 
                     var last = this.CreateHistoryItem(hitTrade);
 
@@ -315,9 +335,15 @@ namespace HitBTCVendor
             {
                 var hitPeriod = this.ConvertPeriod(requestParameters.Period);
 
-                var candles = this.CheckHitResponse(this.restApi.GetCandlesAsync(symbol, hitPeriod, 1000, token).Result, out HitError hitError, true);
-                if (hitError == null)
+                var intervals = requestParameters.Interval.Split(TimeSpan.FromTicks(requestParameters.Period.Ticks * MAX_TRADES_BY_REQUEST));
+
+                foreach (var interval in intervals)
                 {
+                    var candles = this.CheckHitResponse(this.restApi.GetCandlesAsync(symbol, interval.From, interval.To, hitPeriod, MAX_TRADES_BY_REQUEST, token).Result, out _, true);
+
+                    if (candles == null)
+                        return null;
+
                     foreach (var candle in candles)
                     {
                         if (token.IsCancellationRequested)
@@ -373,36 +399,38 @@ namespace HitBTCVendor
                 AllowCalculateRealtimeVolume = false,
                 AllowCalculateRealtimeTicks = false,
                 AllowCalculateRealtimeTrades = false,
+                
+                AllowAbbreviatePriceByTickSize = true,
 
-                SymbolAdditionalInfo = new List<SymbolAdditionalInfoItem>
+                SymbolAdditionalInfo = new List<AdditionalInfoItem>
                 {
-                    new SymbolAdditionalInfoItem
+                    new AdditionalInfoItem
                     {
                         GroupInfo = TRADING_INFO_GROUP,
                         SortIndex = 100,
-                        APIKey = "Take liquidity rate",
+                        Id = "Take liquidity rate",
                         NameKey = loc.key("Take liquidity rate"),
                         ToolTipKey = loc.key("Take liquidity rate"),
                         DataType = ComparingType.Double,
                         Value = (double)hitSymbol.TakeLiquidityRate,
                         Hidden = false
                     },
-                    new SymbolAdditionalInfoItem
+                    new AdditionalInfoItem
                     {
                         GroupInfo = TRADING_INFO_GROUP,
                         SortIndex = 110,
-                        APIKey = "Provide liquidity rate",
+                        Id = "Provide liquidity rate",
                         NameKey = loc.key("Provide liquidity rate"),
                         ToolTipKey = loc.key("Provide liquidity rate"),
                         DataType = ComparingType.Double,
                         Value = (double)hitSymbol.ProvideLiquidityRate,
                         Hidden = false
                     },
-                    new SymbolAdditionalInfoItem
+                    new AdditionalInfoItem
                     {
                         GroupInfo = TRADING_INFO_GROUP,
                         SortIndex = 120,
-                        APIKey = "Fee currency",
+                        Id = "Fee currency",
                         NameKey = loc.key("Fee currency"),
                         ToolTipKey = loc.key("Fee currency"),
                         DataType = ComparingType.String,
@@ -426,14 +454,14 @@ namespace HitBTCVendor
             High = (double)hitCandle.Max,
             Low = (double)hitCandle.Min,
             Close = (double)hitCandle.Close,
-            Volume = (double)hitCandle.VolumeQuote
+            Volume = (double)hitCandle.Volume
         };
 
         private IHistoryItem CreateHistoryItem(HitTrade hitTrade) => new HistoryItemLast
         {
             TicksLeft = hitTrade.Timestamp.Ticks,
             Price = (double)hitTrade.Price,
-            Volume = (double)(hitTrade.Price * hitTrade.Quantity)
+            Volume = (double)hitTrade.Quantity
         };
 
         private Quote CreateQuote(HitTicker hitTicker)
@@ -442,7 +470,7 @@ namespace HitBTCVendor
             double bid = hitTicker.Bid.HasValue ? (double)hitTicker.Bid : double.NaN;
             double ask = hitTicker.Ask.HasValue ? (double)hitTicker.Ask : double.NaN;
             DateTime dateTime = hitTicker.Timestamp;
-            return new Quote(symbol, bid, 0, ask, 0, dateTime);
+            return new Quote(symbol, bid, double.NaN, ask, double.NaN, dateTime);
         }
 
         private DOMQuote CreateDOMQuote(HitOrderBookData hitOrderBookData)
@@ -494,7 +522,7 @@ namespace HitBTCVendor
             {
                 DateTime dateTime = item.Timestamp;
                 double price = (double)item.Price;
-                double size = (double)(item.Price * item.Quantity);
+                double size = (double)item.Quantity;
 
                 if (dateTime.Ticks <= lastTimeTicks)
                     dateTime = new DateTime(++lastTimeTicks, DateTimeKind.Utc);
@@ -576,7 +604,7 @@ namespace HitBTCVendor
 
             if (hitError != null && pushDealTicketOnError)
             {
-                var dealTicket = DealTicketGenerator.CreateRefuseDealTicket(hitError.ToString());
+                var dealTicket = DealTicketGenerator.CreateRefuseDealTicket(hitError.Format());
 
                 this.PushMessage(dealTicket);
             }

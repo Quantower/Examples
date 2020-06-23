@@ -1,4 +1,6 @@
-﻿namespace BitfinexVendor.API.Models
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+namespace BitfinexVendor.API.Models
 {
     class BitfinexBookItem
     {

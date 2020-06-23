@@ -1,4 +1,6 @@
-﻿using BitfinexVendor.API.JsonConverters;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using BitfinexVendor.API.JsonConverters;
 using Newtonsoft.Json;
 
 namespace BitfinexVendor.API.Models

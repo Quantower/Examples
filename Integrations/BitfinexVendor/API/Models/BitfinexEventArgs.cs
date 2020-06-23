@@ -1,4 +1,6 @@
-﻿using BitfinexVendor.API.Models;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using BitfinexVendor.API.Models;
 using System;
 using System.Collections.Generic;
 

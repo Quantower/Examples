@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
 using TradingPlatform.BusinessLayer;
@@ -28,7 +30,7 @@ namespace HitBTCVendor
         public override VendorMetaData GetVendorMetaData() => new VendorMetaData
         {
             VendorName = VENDOR_NAME,
-            VendorDescription = "Market data connection. Trading coming soon."
+            VendorDescription = loc.key("Market data connection. Trading coming soon.")
         };
         #endregion Integration details
 
@@ -47,12 +49,12 @@ namespace HitBTCVendor
                     new SettingItemRadioLocalized(CONNECTION, infoItem, new List<SelectItem> { infoItem, tradingItem }),
                     new SettingItemString(PARAMETER_API_KEY, string.Empty)
                     {
-                        Text = "API key",
+                        Text = loc.key("API key"),
                         Relation = relation
                     },
                     new SettingItemPassword(PARAMETER_SECRET_KEY, new PasswordHolder())
                     {
-                        Text = "Secret key",
+                        Text = loc.key("Secret key"),
                         Relation = relation
                     }
                 })
@@ -69,11 +71,11 @@ namespace HitBTCVendor
         public override ConnectionResult Connect(ConnectRequestParameters connectRequestParameters)
         {
             if (!NetworkInterface.GetIsNetworkAvailable())
-                return ConnectionResult.CreateFail("Network does not available");
+                return ConnectionResult.CreateFail(loc._("Network does not available"));
 
             var settingItem = connectRequestParameters.ConnectionSettings.GetItemByPath(LOGIN_PARAMETER_GROUP, CONNECTION);
             if (settingItem == null || !(settingItem.Value is SelectItem selectItem))
-                return ConnectionResult.CreateFail("Can't find connection parameters");
+                return ConnectionResult.CreateFail(loc._("Can't find connection parameters"));
 
             MarketDataVendor hitBTCVendor = null;
             if (selectItem.Value.ToString() == CONNECTION_INFO)
@@ -96,22 +98,24 @@ namespace HitBTCVendor
 
         #endregion Connection
 
-        #region Symbols and symbol groups         
-        public override IList<MessageSymbol> GetSymbols() => this.vendor.GetSymbols();
+        #region Symbols and symbol groups     
+        
+        public override IList<MessageSymbol> GetSymbols(CancellationToken token) => this.vendor.GetSymbols(token);
 
-        public override MessageSymbolTypes GetSymbolTypes() => this.vendor.GetSymbolTypes();
+        public override MessageSymbolTypes GetSymbolTypes(CancellationToken token) => this.vendor.GetSymbolTypes(token);
 
-        public override IList<MessageAsset> GetAssets() => this.vendor.GetAssets();
+        public override IList<MessageAsset> GetAssets(CancellationToken token) => this.vendor.GetAssets(token);
 
-        public override IList<MessageExchange> GetExchanges() => this.vendor.GetExchanges();
+        public override IList<MessageExchange> GetExchanges(CancellationToken token) => this.vendor.GetExchanges(token);
         #endregion
 
         #region Accounts and rules
-        public override IList<MessageAccount> GetAccounts() => this.vendor.GetAccounts();
+        public override IList<MessageAccount> GetAccounts(CancellationToken token) => this.vendor.GetAccounts(token);
 
-        public override IList<MessageCryptoAssetBalances> GetCryptoAssetBalances() => this.vendor.GetCryptoAssetBalances();
+        public override IList<MessageCryptoAssetBalances> GetCryptoAssetBalances(CancellationToken token) => this.vendor.GetCryptoAssetBalances(token);
 
-        public override IList<MessageRule> GetRules() => this.vendor.GetRules();
+        public override IList<MessageRule> GetRules(CancellationToken token) => this.vendor.GetRules(token);
+
         #endregion Accounts and rules
 
         #region Subscriptions
@@ -121,15 +125,15 @@ namespace HitBTCVendor
         #endregion Subscriptions
 
         #region History
-        public override HistoryMetadata GetHistoryMetadata() => this.vendor.GetHistoryMetadata();
+        public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken) => this.vendor.GetHistoryMetadata(cancelationToken);
 
         public override IList<IHistoryItem> LoadHistory(HistoryRequestParameters requestParameters) => this.vendor.LoadHistory(requestParameters);
         #endregion History
 
         #region Orders
-        public override IList<OrderType> GetAllowedOrderTypes() => this.vendor.GetAllowedOrderTypes();
+        public override IList<OrderType> GetAllowedOrderTypes(CancellationToken token) => this.vendor.GetAllowedOrderTypes(token);
 
-        public override IList<MessageOpenOrder> GetPendingOrders() => this.vendor.GetPendingOrders();
+        public override IList<MessageOpenOrder> GetPendingOrders(CancellationToken token) => this.vendor.GetPendingOrders(token);
         #endregion Orders
 
         #region Trading
@@ -141,7 +145,7 @@ namespace HitBTCVendor
         #endregion Trading
 
         #region Reports
-        public override IList<MessageReportType> GetReportsMetaData() => this.vendor.GetReportsMetaData();
+        public override IList<MessageReportType> GetReportsMetaData(CancellationToken token) => this.vendor.GetReportsMetaData(token);
 
         public override Report GenerateReport(ReportRequestParameters reportRequestParameters) => this.vendor.GenerateReport(reportRequestParameters);
         #endregion Reports

@@ -7,6 +7,7 @@
     <Platforms>AnyCPU;x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Configurations>Debug;Release;UnitTests;Screener</Configurations>
   </PropertyGroup>
   
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -40,7 +41,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="HitBTC.Net" Version="1.0.6-beta" />
+    <PackageReference Include="HitBTC.Net" Version="1.1.0" />
   </ItemGroup>
   
   <ItemGroup>

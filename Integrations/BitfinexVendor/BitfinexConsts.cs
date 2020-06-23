@@ -1,4 +1,6 @@
-﻿namespace BitfinexVendor
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+namespace BitfinexVendor
 {
     static class BitfinexConsts
     {
@@ -9,5 +11,7 @@
 
         public const int TRADES_LIMIT = 1000;
         public const int CANDLES_LIMIT = 1000;
+
+        public const string SYMBOL_SEPARATOR = ":";
     }
 }

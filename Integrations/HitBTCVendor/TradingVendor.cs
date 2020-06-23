@@ -1,4 +1,6 @@
-﻿using HitBTC.Net;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using HitBTC.Net;
 using HitBTC.Net.Communication;
 using HitBTC.Net.Models;
 using System;
@@ -80,7 +82,7 @@ namespace HitBTCVendor
             // login
             this.CheckHitResponse(this.socketApi.LoginAsync(token).Result, out var error);
             if (error != null)
-                return ConnectionResult.CreateFail(error.ToString());
+                return ConnectionResult.CreateFail(error.Format());
 
             if (token.IsCancellationRequested)
                 return ConnectionResult.CreateCancelled();
@@ -88,7 +90,7 @@ namespace HitBTCVendor
             // subscribe reports
             this.CheckHitResponse(this.socketApi.SubscribeReportsAsync(token).Result, out error);
             if (error != null)
-                return ConnectionResult.CreateFail(error.ToString());
+                return ConnectionResult.CreateFail(error.Format());
 
             if (token.IsCancellationRequested)
                 return ConnectionResult.CreateCancelled();
@@ -96,7 +98,7 @@ namespace HitBTCVendor
             // get balances
             this.UpdateBalances(token, out error);
             if (error != null)
-                return ConnectionResult.CreateFail(error.ToString());
+                return ConnectionResult.CreateFail(error.Format());
 
             if (token.IsCancellationRequested)
                 return ConnectionResult.CreateCancelled();
@@ -125,17 +127,17 @@ namespace HitBTCVendor
         #endregion Connection
 
         #region Accounts and rules
-        public override IList<MessageAccount> GetAccounts() => new List<MessageAccount>
+        public override IList<MessageAccount> GetAccounts(CancellationToken token) => new List<MessageAccount>
         {
             new MessageCryptoAccount
             {
                 AccountId = ACCOUNT,
                 AccountName = ACCOUNT,
-                AccountAdditionalInfo = new List<AccountAdditionalInfoItem>()
+                AccountAdditionalInfo = new List<AdditionalInfoItem>()
             }
         };
 
-        public override IList<MessageCryptoAssetBalances> GetCryptoAssetBalances()
+        public override IList<MessageCryptoAssetBalances> GetCryptoAssetBalances(CancellationToken token)
         {
             var result = new List<MessageCryptoAssetBalances>();
 
@@ -145,7 +147,7 @@ namespace HitBTCVendor
             return result;
         }
 
-        public override IList<MessageRule> GetRules() => new List<MessageRule>
+        public override IList<MessageRule> GetRules(CancellationToken token) => new List<MessageRule>
         {
             new MessageRule
             {
@@ -156,20 +158,25 @@ namespace HitBTCVendor
             {
                 Name = Rule.ALLOW_TP,
                 Value = false
+            },
+            new MessageRule
+            {
+                Name = Rule.ALLOW_MODIFY_TIF,
+                Value = false
             }
         };
         #endregion Accounts and rules
 
         #region Orders
-        public override IList<OrderType> GetAllowedOrderTypes() => new List<OrderType>
+        public override IList<OrderType> GetAllowedOrderTypes(CancellationToken token) => new List<OrderType>
         {
-            new MarketOrderType(TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK, TimeInForce.Day, TimeInForce.GTD),
-            new LimitOrderType(TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK, TimeInForce.Day, TimeInForce.GTD),
-            new StopOrderType(TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK, TimeInForce.Day, TimeInForce.GTD),
-            new StopLimitOrderType(TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK, TimeInForce.Day, TimeInForce.GTD)
+            new MarketOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
+            new LimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
+            new StopOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
+            new StopLimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD)
         };
 
-        public override IList<MessageOpenOrder> GetPendingOrders()
+        public override IList<MessageOpenOrder> GetPendingOrders(CancellationToken token)
         {
             var result = new List<MessageOpenOrder>();
 
@@ -203,7 +210,7 @@ namespace HitBTCVendor
             if (timeInForce == HitTimeInForce.GTD)
                 expireTime = parameters.ExpirationTime;
 
-            var response = this.CheckHitResponse(this.socketApi.PlaceNewOrderAsync(symbol, side, quantity, price, stopPrice, timeInForce, expireTime, cancellationToken: parameters.CancellationToken).Result, out var error);
+            var response = this.CheckHitResponse(this.socketApi.PlaceNewOrderAsync(symbol, side, quantity, price, stopPrice, timeInForce, expireTime, cancellationToken: parameters.CancellationToken).Result, out var error, true);
 
             if (response != null)
             {
@@ -232,7 +239,7 @@ namespace HitBTCVendor
             else
                 price = (decimal)parameters.TriggerPrice;
 
-            var response = this.CheckHitResponse(this.socketApi.ReplaceOrderAsync(orderId, quantity, price, cancellationToken: parameters.CancellationToken).Result, out var error);
+            var response = this.CheckHitResponse(this.socketApi.ReplaceOrderAsync(orderId, quantity, price, cancellationToken: parameters.CancellationToken).Result, out var error, true);
 
             if (response != null)
             {
@@ -252,7 +259,7 @@ namespace HitBTCVendor
         {
             var result = new TradingOperationResult();
 
-            var response = this.CheckHitResponse(this.socketApi.CancelOrderAsync(parameters.Order.Id, parameters.CancellationToken).Result, out var error);
+            var response = this.CheckHitResponse(this.socketApi.CancelOrderAsync(parameters.Order.Id, parameters.CancellationToken).Result, out var error, true);
 
             if (response != null)
             {
@@ -270,7 +277,7 @@ namespace HitBTCVendor
         #endregion Trading
 
         #region Reports
-        public override IList<MessageReportType> GetReportsMetaData() => new List<MessageReportType>
+        public override IList<MessageReportType> GetReportsMetaData(CancellationToken token) => new List<MessageReportType>
         {
             new MessageReportType
             {
@@ -326,20 +333,19 @@ namespace HitBTCVendor
         {
             var report = new Report();
 
-            report.AddColumn("Created at", ComparingType.DateTime);
-            report.AddColumn("Symbol", ComparingType.String);
+            report.AddColumn("Date", ComparingType.DateTime);
+            report.AddColumn("Created", ComparingType.DateTime);
+            report.AddColumn("Market", ComparingType.String);
+            report.AddColumn("Order id", ComparingType.Long);
+            report.AddColumn("Client order id", ComparingType.String);
             report.AddColumn("Side", ComparingType.String);
             report.AddColumn("Order type", ComparingType.String);
-            report.AddColumn("Quantity", ComparingType.Double);
-            report.AddColumn("Cumulative quantity", ComparingType.Double);
             report.AddColumn("Price", ComparingType.Double);
             report.AddColumn("Stop price", ComparingType.Double);
+            report.AddColumn("Amount", ComparingType.Double);
+            report.AddColumn("Executed", ComparingType.Double);
             report.AddColumn("Time in force", ComparingType.String);
-            report.AddColumn("Expire at", ComparingType.DateTime);
             report.AddColumn("Status", ComparingType.String);
-            report.AddColumn("Updated at", ComparingType.DateTime);
-            report.AddColumn("Client order id", ComparingType.String);
-            report.AddColumn("Order id", ComparingType.Long);
 
             string symbolName = null;
 
@@ -369,23 +375,31 @@ namespace HitBTCVendor
 
             foreach(var order in ordersHistory)
             {
+                double price = 0d;
+                double stopPrice = 0d;
+
+                if (order.OrderType == HitOrderType.Limit || order.OrderType == HitOrderType.StopLimit)
+                    price = (double)order.Price;
+
+                if (order.OrderType == HitOrderType.StopMarket || order.OrderType == HitOrderType.StopLimit)
+                    stopPrice = (double)order.StopPrice;
+
                 var row = new ReportRow();
 
+                row.AddCell(order.UpdatedAt, new DateTimeFormatterDescription(order.UpdatedAt));
                 row.AddCell(order.CreatedAt, new DateTimeFormatterDescription(order.CreatedAt));
                 row.AddCell(order.Symbol);
+                row.AddCell(order.Id);
+                row.AddCell(order.ClientOrderId);
                 row.AddCell(order.Side.ToString());
                 row.AddCell(this.ConvertOrderType(order.OrderType));
+                row.AddCell(price, new PriceFormattingDescription(price, order.Symbol));
+                row.AddCell(stopPrice, new PriceFormattingDescription(stopPrice, order.Symbol));
                 row.AddCell(order.Quantity, new VolumeFormattingDescription((double)order.Quantity, order.Symbol));
                 row.AddCell(order.CumulativeQuantity, new VolumeFormattingDescription((double)order.CumulativeQuantity, order.Symbol));
-                row.AddCell(order.Price, new PriceFormattingDescription((double)order.Price, order.Symbol));
-                row.AddCell(order.StopPrice, new PriceFormattingDescription((double)order.StopPrice, order.Symbol));
                 row.AddCell(this.ConvertTimeInForce(order.TimeInForce).ToString());
-                row.AddCell(order.ExpireTime, new DateTimeFormatterDescription(order.ExpireTime));
                 row.AddCell(this.ConvertOrderStatus(order.Status).ToString());
-                row.AddCell(order.UpdatedAt, new DateTimeFormatterDescription(order.UpdatedAt));
-                row.AddCell(order.ClientOrderId);
-                row.AddCell(order.Id);
-
+                
                 report.Rows.Add(row);
             }
 
@@ -396,21 +410,26 @@ namespace HitBTCVendor
         {
             var report = new Report();
 
-            report.AddColumn("Timestamp", ComparingType.DateTime);
-            report.AddColumn("Symbol", ComparingType.String);
-            report.AddColumn("Side", ComparingType.String);
-            report.AddColumn("Quantity", ComparingType.Double);
-            report.AddColumn("Price", ComparingType.Double);
-            report.AddColumn("Fee", ComparingType.String);
+            report.AddColumn("Date", ComparingType.DateTime);
+            report.AddColumn("Market", ComparingType.String);
             report.AddColumn("Trade id", ComparingType.Long);
-            report.AddColumn("Client order id", ComparingType.String);
             report.AddColumn("Order id", ComparingType.Long);
+            report.AddColumn("Client order id", ComparingType.String);
+            report.AddColumn("Side", ComparingType.String);
+            report.AddColumn("Amount", ComparingType.Double);
+            report.AddColumn("Price", ComparingType.Double);
+            report.AddColumn("Total", ComparingType.String);
+            report.AddColumn("Fee", ComparingType.String);
+            report.AddColumn("Rebate", ComparingType.String);
 
             string symbolName = null;
 
             var settingItem = reportRequestParameters.ReportType.Settings.GetItemByName(REPORT_TYPE_PARAMETER_SYMBOL);
             if (settingItem?.Value is Symbol symbol)
                 symbolName = symbol.Id;
+
+            if (string.IsNullOrEmpty(symbolName) || !this.symbolsCache.TryGetValue(symbolName, out var hitSymbol))
+                return report;
 
             if (!this.TryGetReportFromTo(reportRequestParameters.ReportType.Settings, out var from, out var to))
                 return report;
@@ -434,17 +453,23 @@ namespace HitBTCVendor
 
             foreach(var trade in tradesHistory)
             {
+                double fee = (double)(trade.Fee > 0 ? trade.Fee * -1m : 0m);
+                double rebate = (double)(trade.Fee > 0 ? 0m : trade.Fee * -1m);
+                double total = (double)(trade.Price * trade.Quantity);
+
                 var row = new ReportRow();
 
                 row.AddCell(trade.Timestamp, new DateTimeFormatterDescription(trade.Timestamp));
                 row.AddCell(trade.Symbol);
+                row.AddCell(trade.Id);
+                row.AddCell(trade.OrderId);
+                row.AddCell(trade.ClientOrderId);
                 row.AddCell(trade.Side.ToString());
                 row.AddCell((double)trade.Quantity, new VolumeFormattingDescription((double)trade.Quantity, trade.Symbol));
                 row.AddCell((double)trade.Price, new PriceFormattingDescription((double)trade.Price, trade.Symbol));
-                row.AddCell((double)trade.Fee, new AssetFormattingDescription(this.symbolsCache[trade.Symbol].FeeCurrency, (double)trade.Fee));
-                row.AddCell(trade.Id);
-                row.AddCell(trade.ClientOrderId);
-                row.AddCell(trade.OrderId);
+                row.AddCell(total, new AssetFormattingDescription(hitSymbol.FeeCurrency, total));
+                row.AddCell(fee, new AssetFormattingDescription(hitSymbol.FeeCurrency, fee));
+                row.AddCell(rebate, new AssetFormattingDescription(hitSymbol.FeeCurrency, rebate));
 
                 report.Rows.Add(row);
             }
@@ -456,17 +481,17 @@ namespace HitBTCVendor
         {
             var report = new Report();
 
+            report.AddColumn("Date", ComparingType.DateTime);
             report.AddColumn("Created at", ComparingType.DateTime);
             report.AddColumn("Id", ComparingType.String);
-            report.AddColumn("Index", ComparingType.Long);
+            report.AddColumn("Type", ComparingType.String);
             report.AddColumn("Currency", ComparingType.String);
             report.AddColumn("Amount", ComparingType.Double);
             report.AddColumn("Fee", ComparingType.Double);
-            report.AddColumn("Address", ComparingType.String);
             report.AddColumn("Hash", ComparingType.String);
+            report.AddColumn("Address", ComparingType.String);
+            report.AddColumn("Index", ComparingType.Long);
             report.AddColumn("Status", ComparingType.String);
-            report.AddColumn("Type", ComparingType.String);
-            report.AddColumn("Updated at", ComparingType.DateTime);
 
             if (!this.TryGetReportFromTo(reportRequestParameters.ReportType.Settings, out var from, out var to))
                 return report;
@@ -490,20 +515,35 @@ namespace HitBTCVendor
 
             foreach(var transaction in transactionsHistory)
             {
+                string type = "";
+
+                switch(transaction.Type)
+                {
+                    case HitTransactionType.BankToExchange:
+                        type = "Transfer to trading account";
+                        break;
+                    case HitTransactionType.ExchangeToBank:
+                        type = "Transfer to main accout";
+                        break;
+                    default:
+                        type = transaction.Type.ToString();
+                        break;
+                }
+
                 var row = new ReportRow();
 
+                row.AddCell(transaction.UpdatedAt, new DateTimeFormatterDescription(transaction.UpdatedAt));
                 row.AddCell(transaction.CreatedAt, new DateTimeFormatterDescription(transaction.CreatedAt));
                 row.AddCell(transaction.Id);
-                row.AddCell(transaction.Index);
+                row.AddCell(type);
                 row.AddCell(transaction.Currency);
                 row.AddCell((double)transaction.Amount);
                 row.AddCell((double)transaction.Fee);
-                row.AddCell(transaction.Address);
                 row.AddCell(transaction.Hash);
+                row.AddCell(transaction.Address);
+                row.AddCell(transaction.Index);
                 row.AddCell(transaction.Status.ToString());
-                row.AddCell(transaction.Type.ToString());
-                row.AddCell(transaction.UpdatedAt, new DateTimeFormatterDescription(transaction.UpdatedAt));
-
+                
                 report.Rows.Add(row);
             }
 
@@ -591,7 +631,7 @@ namespace HitBTCVendor
             Fee = new PnLItem
             {
                 AssetID = this.symbolsCache[hitReport.Symbol].FeeCurrency,
-                Value = (double)hitReport.TradeFee,
+                Value = -1 * (double)hitReport.TradeFee,
             },
             OrderId = hitReport.ClientOrderId,
             OrderTypeId = this.ConvertOrderType(hitReport.OrderType),
@@ -623,10 +663,9 @@ namespace HitBTCVendor
             switch(hitOrderStatus)
             {
                 case HitOrderStatus.New:
+                case HitOrderStatus.Suspended:
                 default:
                     return OrderStatus.Opened;
-                case HitOrderStatus.Suspended:
-                    return OrderStatus.Modified;
                 case HitOrderStatus.Canceled:
                 case HitOrderStatus.Expired:
                     return OrderStatus.Canceled;
@@ -678,21 +717,21 @@ namespace HitBTCVendor
         private void UpdateBalances(CancellationToken token, out HitError hitError)
         {
             // Trading balances
-            var tradingBalances = this.CheckHitResponse(this.socketApi.GetTradingBalanceAsync().Result, out hitError)?
+            var tradingBalances = this.CheckHitResponse(this.socketApi.GetTradingBalanceAsync().Result, out hitError, true)?
                 .Where(b => b.Available + b.Reserved > 0);
 
             if (tradingBalances == null || hitError != null || token.IsCancellationRequested)
                 return;
 
             // Account balances
-            var accountBalances = this.CheckHitResponse(this.restApi.GetAccountBalancesAsync().Result, out hitError)?
+            var accountBalances = this.CheckHitResponse(this.restApi.GetAccountBalancesAsync().Result, out hitError, true)?
                 .Where(b => b.Available + b.Reserved > 0);
 
             if (accountBalances == null || hitError != null || token.IsCancellationRequested)
                 return;
 
             // Tickers
-            var tickers = this.CheckHitResponse(this.restApi.GetTickersAsync().Result, out hitError)?
+            var tickers = this.CheckHitResponse(this.restApi.GetTickersAsync().Result, out hitError, true)?
                 .ToDictionary(t => t.Symbol);
 
             if (tickers == null || hitError != null || token.IsCancellationRequested)
@@ -720,6 +759,14 @@ namespace HitBTCVendor
                     totalBalances[balance.Currency] = (value.total + balance.Available + balance.Reserved, value.available, value.reserved + balance.Reserved);
                 else
                     totalBalances[balance.Currency] = (balance.Available + balance.Reserved, 0, balance.Reserved);
+            }
+
+            foreach(var item in this.currenciesCache)
+            {
+                if (totalBalances.ContainsKey(item.Key))
+                    continue;
+
+                totalBalances[item.Key] = (0, 0, 0);
             }
 
             var messages = new List<MessageCryptoAssetBalances>();
@@ -814,11 +861,7 @@ namespace HitBTCVendor
 
                         this.PushMessage(dealTicket);
                     }
-
-                    this.updateBalancesCancellation = null;
                 });
-
-
         }
         #endregion
 

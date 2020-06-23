@@ -1,4 +1,6 @@
-﻿using BitfinexVendor.API.Models;
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+using BitfinexVendor.API.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;

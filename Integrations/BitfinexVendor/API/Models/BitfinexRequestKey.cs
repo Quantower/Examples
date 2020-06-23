@@ -1,4 +1,6 @@
-﻿namespace BitfinexVendor.API
+﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+
+namespace BitfinexVendor.API
 {
     struct BitfinexRequestKey
     {
