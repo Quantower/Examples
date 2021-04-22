@@ -1,30 +1,25 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <OutputPath>$(SolutionDir)bin/bin/Vendors/$(AssemblyName)</OutputPath>
-    <Platforms>AnyCPU;x64</Platforms>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Platforms>AnyCPU;x64</Platforms>    
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Configurations>Debug;Release;UnitTests;Screener</Configurations>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <DebugType>full</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
-  </PropertyGroup>
+  
   <ItemGroup>
     <None Remove="Bitfinex.svg" />
   </ItemGroup>
@@ -38,7 +33,11 @@
     <PackageReference Include="WebSocket4Net" Version="0.15.2" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\BusinessLayer\TradingPlatform.BusinessLayer\TradingPlatform.BusinessLayer.csproj" />
+    <ProjectReference Include="..\..\BusinessLayer\TradingPlatform.BusinessLayer\TradingPlatform.BusinessLayer.csproj" >
+      <Private>False</Private>
+      <IncludeAssets>compile</IncludeAssets>
+    </ProjectReference>
   </ItemGroup>
+  <Import Project="..\..\BusinessLayer\SertificateValidatorShared\SertificateValidatorShared.projitems" Label="Shared" />
 
 </Project>

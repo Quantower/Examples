@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <OutputPath>$(SolutionDir)bin/bin/Vendors/$(AssemblyName)</OutputPath>
     <Platforms>AnyCPU;x64</Platforms>
@@ -10,22 +10,12 @@
     <Configurations>Debug;Release;UnitTests;Screener</Configurations>
   </PropertyGroup>
   
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
-  
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <DebugType>full</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
-  
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
-  </PropertyGroup>
-  
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>  
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
@@ -45,7 +35,12 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\..\BusinessLayer\TradingPlatform.BusinessLayer\TradingPlatform.BusinessLayer.csproj" />
+    <ProjectReference Include="..\..\BusinessLayer\TradingPlatform.BusinessLayer\TradingPlatform.BusinessLayer.csproj" >
+      <Private>False</Private>
+      <IncludeAssets>compile</IncludeAssets>
+    </ProjectReference>
   </ItemGroup>
+  
+  <Import Project="..\..\BusinessLayer\SertificateValidatorShared\SertificateValidatorShared.projitems" Label="Shared" />
 
 </Project>

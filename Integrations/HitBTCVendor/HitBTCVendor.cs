@@ -1,5 +1,6 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
 
+using SertificateValidatorShared;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
@@ -23,50 +24,52 @@ namespace HitBTCVendor
         private Vendor vendor;
         #endregion Properties
 
+
         public HitBTCVendor()
-        { }
+        {
+        }
 
         #region Integration details
-        public override VendorMetaData GetVendorMetaData() => new VendorMetaData
+
+        public static VendorMetaData GetVendorMetaData() => new VendorMetaData
         {
             VendorName = VENDOR_NAME,
-            VendorDescription = loc.key("Market data connection. Trading coming soon.")
+            VendorDescription = loc.key("Market data connection. Trading coming soon."),
+
+            GetDefaultConnections = () => new List<ConnectionInfo>
+            {
+                CreateDefaultConnectionInfo("HitBTC", VENDOR_NAME, "HitBTCVendor\\hit_btc.svg")
+            },
+            GetConnectionParameters = () =>
+            {
+                var infoItem = new SelectItem(CONNECTION_INFO, CONNECTION_INFO);
+                var tradingItem = new SelectItem(CONNECTION_TRADING, CONNECTION_TRADING);
+
+                var relation = new SettingItemRelationEnability(CONNECTION, tradingItem);
+
+                return new List<SettingItem>
+                {
+                    new SettingItemGroup(LOGIN_PARAMETER_GROUP, new List<SettingItem>
+                    {
+                        new SettingItemRadioLocalized(CONNECTION, infoItem, new List<SelectItem> { infoItem, tradingItem }),
+                        new SettingItemString(PARAMETER_API_KEY, string.Empty)
+                        {
+                            Text = loc.key("API key"),
+                            Relation = relation
+                        },
+                        new SettingItemPassword(PARAMETER_SECRET_KEY, new PasswordHolder())
+                        {
+                            Text = loc.key("Secret key"),
+                            Relation = relation
+                        }
+                    })
+                };
+            },
         };
+
         #endregion Integration details
 
         #region Connection
-        public override IList<SettingItem> GetConnectionParameters()
-        {
-            var infoItem = new SelectItem(CONNECTION_INFO, CONNECTION_INFO);
-            var tradingItem = new SelectItem(CONNECTION_TRADING, CONNECTION_TRADING);
-
-            var relation = new SettingItemRelationEnability(CONNECTION, tradingItem);
-
-            var result =  new List<SettingItem>
-            {
-                new SettingItemGroup(LOGIN_PARAMETER_GROUP, new List<SettingItem>
-                {
-                    new SettingItemRadioLocalized(CONNECTION, infoItem, new List<SelectItem> { infoItem, tradingItem }),
-                    new SettingItemString(PARAMETER_API_KEY, string.Empty)
-                    {
-                        Text = loc.key("API key"),
-                        Relation = relation
-                    },
-                    new SettingItemPassword(PARAMETER_SECRET_KEY, new PasswordHolder())
-                    {
-                        Text = loc.key("Secret key"),
-                        Relation = relation
-                    }
-                })
-            };
-
-            return result;
-        }
-
-        public override IList<ConnectionInfo> GetDefaultConnections() => new List<ConnectionInfo>
-        {
-            this.CreateDefaultConnectionInfo("HitBTC", VENDOR_NAME, "HitBTCVendor\\hit_btc.svg")
-        };
 
         public override ConnectionResult Connect(ConnectRequestParameters connectRequestParameters)
         {

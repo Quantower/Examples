@@ -1,4 +1,4 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+﻿// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
 
 using HitBTC.Net;
 using HitBTC.Net.Communication;
@@ -17,7 +17,7 @@ namespace HitBTCVendor
     internal class MarketDataVendor : Vendor
     {
         #region Consts
-        private const int EXCHANGE_ID = 1;
+        private const string EXCHANGE_ID = "1";
         private const string TRADING_INFO_GROUP = "#20.Trading info";
 
         private const int MAX_TRADES_BY_REQUEST = 1000;

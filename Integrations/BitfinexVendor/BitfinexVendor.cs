@@ -1,7 +1,8 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
 
 using BitfinexVendor.API;
 using BitfinexVendor.API.Models;
+using SertificateValidatorShared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,6 +37,7 @@ namespace BitfinexVendor
         private AggressorFlagCalculator aggressorFlagCalculator;
         #endregion Properties
 
+
         public BitfinexVendor()
         {
             this.restApi = new BitfinexRestApi(BitfinexConsts.API_BASE_ENDPOINT);
@@ -56,20 +58,19 @@ namespace BitfinexVendor
         /// <summary>
         /// Use GetVendorMetaData method to provide general information about integration such s name, description, registration link, etc
         /// </summary>        
-        public override VendorMetaData GetVendorMetaData() => new VendorMetaData
+        public static VendorMetaData GetVendorMetaData() => new VendorMetaData
         {
             VendorName = BitfinexConsts.VENDOR_NAME,
-            VendorDescription = loc.key("Market data connection. Trading coming soon.")
+            VendorDescription = loc.key("Market data connection. Trading coming soon."),
+            GetDefaultConnections = () => new List<ConnectionInfo>
+            {
+                CreateDefaultConnectionInfo("Bitfinex", BitfinexConsts.VENDOR_NAME, "BitfinexVendor\\bitfinex.svg", allowCreateCustomConnections: false)
+            },
         };
 
         #endregion Integration detailss
 
         #region Connection
-
-        public override IList<ConnectionInfo> GetDefaultConnections() => new List<ConnectionInfo>
-        {
-            this.CreateDefaultConnectionInfo("Bitfinex", BitfinexConsts.VENDOR_NAME, "BitfinexVendor\\bitfinex.svg", allowCreateCustomConnections: false)
-        };
 
         /// <summary>
         /// Called when user decides to connect to this particular integration via Connections Screen
@@ -219,7 +220,7 @@ namespace BitfinexVendor
             {
                 new MessageExchange()
                 {
-                    Id = BitfinexConsts.EXCHANGE_ID,
+                    Id = BitfinexConsts.EXCHANGE_ID.ToString(),
                     ExchangeName = "Exchange"
                 }
             };
@@ -234,18 +235,14 @@ namespace BitfinexVendor
         /// <summary>
         /// Provides a information about available Rules into the trading platform
         /// </summary> 
-        public override IList<MessageRule> GetRules(CancellationToken token)
+        public override IList<MessageRule> GetRules(CancellationToken token) => new List<MessageRule>
         {
-            var rules = base.GetRules(token);
-
-            rules.Add(new MessageRule
+            new MessageRule
             {
                 Name = Rule.ALLOW_TRADING,
                 Value = false
-            });
-
-            return rules;
-        }
+            }
+        };
         #endregion Accounts and rules
 
         #region Subscriptions
@@ -326,8 +323,8 @@ namespace BitfinexVendor
 
             string symbol = requestParameters.SymbolId;
 
-            long fromUnix = Core.Instance.TimeUtils.ConvertDateTimeToUnixMiliseconds(requestParameters.FromTime);
-            long toUnix = Core.Instance.TimeUtils.ConvertDateTimeToUnixMiliseconds(requestParameters.ToTime);
+            long fromUnix = new DateTimeOffset(requestParameters.FromTime).ToUnixTimeMilliseconds();
+            long toUnix = new DateTimeOffset(requestParameters.ToTime).ToUnixTimeMilliseconds();
 
             Stack<List<IHistoryItem>> itemsStack = new Stack<List<IHistoryItem>>();
 
@@ -429,7 +426,7 @@ namespace BitfinexVendor
                 AllowCalculateRealtimeTicks = false,
                 AllowAbbreviatePriceByTickSize = true,
                 Description = $"{baseAsset} vs {quoteAsset}",
-                ExchangeId = BitfinexConsts.EXCHANGE_ID,
+                ExchangeId = BitfinexConsts.EXCHANGE_ID.ToString(),
                 HistoryType = HistoryType.Last,
                 LotSize = 1,
                 LotStep = Math.Pow(10, -8),
@@ -503,7 +500,7 @@ namespace BitfinexVendor
             Volume = (double)bitfinexTicker.Volume
         };
 
-        private DayBar CreateDayBar(BitfinexTrade bitfinexTrade) => new DayBar(bitfinexTrade.Pair, Core.Instance.TimeUtils.ConvertUnixSecondsToDateTime((int)bitfinexTrade.Timestamp))
+        private DayBar CreateDayBar(BitfinexTrade bitfinexTrade) => new DayBar(bitfinexTrade.Pair, DateTimeOffset.FromUnixTimeSeconds((int)bitfinexTrade.Timestamp).UtcDateTime)
         {
             Last = (double)bitfinexTrade.Price,
             LastSize = (double)Math.Abs(bitfinexTrade.Amount)
@@ -566,7 +563,7 @@ namespace BitfinexVendor
 
         private Last CreateLast(BitfinexTrade bitfinexTrade)
         {
-            DateTime dateTime = Core.Instance.TimeUtils.ConvertUnixSecondsToDateTime((int)bitfinexTrade.Timestamp);
+            DateTime dateTime = DateTimeOffset.FromUnixTimeSeconds((int)bitfinexTrade.Timestamp).UtcDateTime;
 
             if (this.lastTradeTimeCache.TryGetValue(bitfinexTrade.Pair, out long lastTradeTime) && dateTime.Ticks <= lastTradeTime)
                 dateTime = new DateTime(lastTradeTime + 1, DateTimeKind.Utc);
@@ -578,14 +575,14 @@ namespace BitfinexVendor
 
         private IHistoryItem CreateHistoryItemLast(BitfinexTrade bitfinexTrade) => new HistoryItemLast
         {
-            TicksLeft = Core.Instance.TimeUtils.ConvertUnixMilisecondsToDateTime(bitfinexTrade.Timestamp).Ticks,
+            TicksLeft = DateTimeOffset.FromUnixTimeMilliseconds(bitfinexTrade.Timestamp).UtcDateTime.Ticks,
             Price = (double)bitfinexTrade.Price,
             Volume = Math.Abs((double)bitfinexTrade.Amount)
         };
 
         private IHistoryItem CreateHistoryItemBar(BitfinexCandle bitfinexCandle) => new HistoryItemBar
         {
-            TicksLeft = Core.Instance.TimeUtils.ConvertUnixMilisecondsToDateTime(bitfinexCandle.Timestamp).Ticks,
+            TicksLeft = DateTimeOffset.FromUnixTimeMilliseconds(bitfinexCandle.Timestamp).UtcDateTime.Ticks,
             Open = (double)bitfinexCandle.Open,
             High = (double)bitfinexCandle.High,
             Low = (double)bitfinexCandle.Low,

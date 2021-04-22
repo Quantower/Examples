@@ -1,4 +1,4 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2020. All rights reserved.
+﻿// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
 
 using HitBTC.Net.Models;
 using System.Text;
