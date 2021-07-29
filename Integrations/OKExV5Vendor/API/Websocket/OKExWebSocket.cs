@@ -18,15 +18,16 @@ namespace OKExV5Vendor.API.Websocket
 {
     class OKExWebSocket
     {
+        private const int MAX_SUB_UNSUB_CHANNELS_PER_REQUEST = 60;
+
         protected readonly WebSocket webSocket;
         protected readonly ActionBufferedProcessor inputProcessor;
-        private readonly JsonSerializer jsonSerializer;
 
         private readonly bool useQueueRequest;
         private readonly object subscriptionLockKey;
         private readonly Timer innerTimer;
         private readonly Timer pingPongTimer;
-        private readonly IDictionary<string, IDictionary<string, OKExChannelRequest>> pendingSubsribeChannels;
+        private readonly IDictionary<string, IDictionary<string, OKExChannelRequest>> pendingSubscribeChannels;
         private readonly IDictionary<string, IDictionary<string, OKExChannelRequest>> pendingUnsubsribeChannels;
         private readonly Stopwatch sw;
 
@@ -39,8 +40,7 @@ namespace OKExV5Vendor.API.Websocket
         {
             this.webSocket = new WebSocket(uri, sslProtocols: SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls)
             {
-                //AutoSendPingInterval = 25,
-                //EnableAutoSendPing = true
+                EnableAutoSendPing = false
             };
             
             this.useQueueRequest = useQueueRequest;
@@ -55,9 +55,8 @@ namespace OKExV5Vendor.API.Websocket
             this.sw = new Stopwatch();
 
             this.subscriptionLockKey = new object();
-            this.jsonSerializer = new JsonSerializer();
             this.inputProcessor = new ActionBufferedProcessor();
-            this.pendingSubsribeChannels = new Dictionary<string, IDictionary<string, OKExChannelRequest>>();
+            this.pendingSubscribeChannels = new Dictionary<string, IDictionary<string, OKExChannelRequest>>();
             this.pendingUnsubsribeChannels = new Dictionary<string, IDictionary<string, OKExChannelRequest>>();
         }
 
@@ -67,7 +66,7 @@ namespace OKExV5Vendor.API.Websocket
 
             this.webSocket.Open();
 
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             while (!token.IsCancellationRequested && !cts.IsCancellationRequested && this.webSocket.State != WebSocketState.Open)
                 Thread.Sleep(100);
 
@@ -148,8 +147,8 @@ namespace OKExV5Vendor.API.Websocket
                     }
                     else
                     {
-                        if (!this.pendingSubsribeChannels.TryGetValue(item.InstrumentId, out var subChannels))
-                            this.pendingSubsribeChannels[item.InstrumentId] = subChannels = new Dictionary<string, OKExChannelRequest>();
+                        if (!this.pendingSubscribeChannels.TryGetValue(item.InstrumentId, out var subChannels))
+                            this.pendingSubscribeChannels[item.InstrumentId] = subChannels = new Dictionary<string, OKExChannelRequest>();
 
                         if (!subChannels.ContainsKey(item.ChannelName))
                             subChannels[item.ChannelName] = item;
@@ -163,10 +162,10 @@ namespace OKExV5Vendor.API.Websocket
             {
                 foreach (var item in items)
                 {
-                    if (this.pendingSubsribeChannels.TryGetValue(item.InstrumentId, out var subChannels) && subChannels.Remove(item.ChannelName))
+                    if (this.pendingSubscribeChannels.TryGetValue(item.InstrumentId, out var subChannels) && subChannels.Remove(item.ChannelName))
                     {
                         if (subChannels.Count == 0)
-                            this.pendingSubsribeChannels.Remove(item.InstrumentId);
+                            this.pendingSubscribeChannels.Remove(item.InstrumentId);
                     }
                     else
                     {
@@ -185,18 +184,40 @@ namespace OKExV5Vendor.API.Websocket
             {
                 if (this.pendingUnsubsribeChannels.Count > 0)
                 {
-                    var unsubChannels = this.pendingUnsubsribeChannels.Values.SelectMany(s => s.Values);
-                    this.webSocket.Send(JsonConvert.SerializeObject(new OKExUnsubscribeRequest() { Args = unsubChannels.ToArray() }));
+                    var unsubChannels = this.pendingUnsubsribeChannels.Values.SelectMany(s => s.Values).ToArray();
+                    var requestChannels = new List<OKExChannelRequest>();
 
-                    this.pendingUnsubsribeChannels.Clear();
+                    for (int i = 0; i < Math.Min(MAX_SUB_UNSUB_CHANNELS_PER_REQUEST, unsubChannels.Length); i++)
+                    {
+                        var ch = unsubChannels[i];
+                        requestChannels.Add(ch);
+
+                        this.pendingUnsubsribeChannels[ch.InstrumentId].Remove(ch.ChannelName);
+                        if (this.pendingUnsubsribeChannels[ch.InstrumentId].Count == 0)
+                            this.pendingUnsubsribeChannels.Remove(ch.InstrumentId);
+                    }
+
+                    if (requestChannels.Count > 0)
+                        this.webSocket.Send(JsonConvert.SerializeObject(new OKExUnsubscribeRequest() { Args = requestChannels.ToArray() }));
                 }
 
-                if (this.pendingSubsribeChannels.Count > 0)
+                if (this.pendingSubscribeChannels.Count > 0)
                 {
-                    var subChannels = this.pendingSubsribeChannels.Values.SelectMany(s => s.Values);
-                    this.webSocket.Send(JsonConvert.SerializeObject(new OKExSubscribeRequest() { Args = subChannels.ToArray() }));
+                    var subChannels = this.pendingSubscribeChannels.Values.SelectMany(s => s.Values).ToArray();
+                    var requestChannels = new List<OKExChannelRequest>();
 
-                    this.pendingSubsribeChannels.Clear();
+                    for (int i = 0; i < Math.Min(MAX_SUB_UNSUB_CHANNELS_PER_REQUEST, subChannels.Length); i++)
+                    {
+                        var ch = subChannels[i];
+                        requestChannels.Add(ch);
+
+                        this.pendingSubscribeChannels[ch.InstrumentId].Remove(ch.ChannelName);
+                        if (this.pendingSubscribeChannels[ch.InstrumentId].Count == 0)
+                            this.pendingSubscribeChannels.Remove(ch.InstrumentId);
+                    }
+
+                    if (requestChannels.Count > 0)
+                        this.webSocket.Send(JsonConvert.SerializeObject(new OKExSubscribeRequest() { Args = requestChannels.ToArray() }));
                 }
             }
         }

@@ -15,8 +15,10 @@ namespace OKExV5Vendor.API.OrderType
         internal const string STOP_LOSS_TRIGGER_PRICE = "StopLossTriggerPrice";
         internal const string STOP_LOSS_PRICE = "StopLossPrice";
 
+        internal const string ORDER_BEHAVIOUR = "OrderBehaviour";
         internal const string REDUCE_ONLY = "ReduceOnly";
         internal const string POST_ONLY = "PostOnly";
+        internal const string COMMENT = "Comment";
 
         internal const string TRADE_MODE_TYPE = "TradeModeType";
         internal const string MARGIN_CURRENCY = "MarginCurrency";
@@ -61,11 +63,24 @@ namespace OKExV5Vendor.API.OrderType
             settings.Add(triggerPriceSI);
             settings.Add(priceSI);
         }
-        internal static void AddReduceOnly(IList<SettingItem> settings, bool defaultValue = false, int index = 0)
+        internal static void AddReduceOnly(IList<SettingItem> settings, bool defaultType = false, int index = 0)
         {
-            settings.Add(new SettingItemBoolean(REDUCE_ONLY, defaultValue, index)
+            settings.Add(new SettingItemBoolean(REDUCE_ONLY, defaultType, index)
             {
                 Text = loc._("Reduce only"),
+                Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross), new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated))
+            });
+
+        }
+        internal static void AddOrderBehaviour(IList<SettingItem> settings, OKExOrderBehaviourType type = OKExOrderBehaviourType.Open, int index = 0)
+        {
+            settings.Add(new SettingItemRadioLocalized(ORDER_BEHAVIOUR, new SelectItem("", (int)type), new List<SelectItem>()
+            {
+                new SelectItem("Open", (int)OKExOrderBehaviourType.Open),
+                new SelectItem("Close", (int)OKExOrderBehaviourType.Close)
+            }, index)
+            {
+                Text = loc._("Order behaviour"),              
                 Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross), new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated))
             });
         }
@@ -79,21 +94,31 @@ namespace OKExV5Vendor.API.OrderType
             })
             { Text = loc._("Trade mode"), SortIndex = index });
 
-            settings.Add(new SettingItemSelector(MARGIN_CURRENCY, parameters.Symbol.Product.Id, new List<string>()
+            if (parameters.Symbol.SymbolType == SymbolType.Crypto)
             {
-                parameters.Symbol.Product.Id,
-                parameters.Symbol.QuotingCurrency.Id
-            }, index)
-            {
-                Text = loc._("Margin currency"),
-                Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross))
-            });
+                settings.Add(new SettingItemSelector(MARGIN_CURRENCY, parameters.Symbol.Product.Id, new List<string>()
+                {
+                    parameters.Symbol.Product.Id,
+                    parameters.Symbol.QuotingCurrency.Id
+                }, index)
+                {
+                    Text = loc._("Margin currency"),
+                    Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross))
+                });
+            }
         }
         internal static void AddPostOnly(IList<SettingItem> settings, bool defaultValue = false, int index = 0)
         {
             settings.Add(new SettingItemBoolean(POST_ONLY, defaultValue, index)
             {
                 Text = loc._("Post only"),
+            });
+        }
+        internal static void AddComment(IList<SettingItem> settings, string defaultValue, int index = 0)
+        {
+            settings.Add(new SettingItemString(COMMENT, defaultValue, index)
+            {
+                Text = loc._("Comment")
             });
         }
 

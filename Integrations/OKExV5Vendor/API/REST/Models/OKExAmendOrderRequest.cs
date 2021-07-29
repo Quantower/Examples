@@ -16,6 +16,9 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("newPx")]
         public double? NewPrice { get; set; }
 
+        [JsonProperty("clOrdId")]
+        public string ClientOrderId { get; set; }
+
         public OKExAmendOrderRequest(OKExSymbol symbol, string orderId)
         {
             this.InstrumentId = symbol.OKExInstrumentId;

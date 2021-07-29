@@ -1,4 +1,5 @@
 using OKExV5Vendor.API;
+using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.OrderType;
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket.Models;
@@ -7,12 +8,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 
 namespace OKExV5Vendor.Trading
 {
-    class OKExTradingVendor : OKExMarketVendor
+    class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
     {
         #region Parameters
 
@@ -20,6 +22,9 @@ namespace OKExV5Vendor.Trading
 
         private readonly OKExTradingClient client;
         private OKExAccount account;
+
+        private readonly Dictionary<string, OKExBalanceItem> balancesCache;
+        private OKExBalance totalBalanceInfo;
 
         private readonly IDictionary<string, OKExOrder> ordersCache;
         private readonly IDictionary<string, OKExAlgoOrder> algoOrdersCache;
@@ -32,6 +37,7 @@ namespace OKExV5Vendor.Trading
         {
             this.client = client;
 
+            this.balancesCache = new Dictionary<string, OKExBalanceItem>();
             this.ordersCache = new Dictionary<string, OKExOrder>();
             this.algoOrdersCache = new Dictionary<string, OKExAlgoOrder>();
             this.positionsCache = new Dictionary<string, OKExPosition>();
@@ -264,17 +270,45 @@ namespace OKExV5Vendor.Trading
         {
             return new List<OrderType>()
             {
-                new OKExMarketOrderType(TimeInForce.Default, TimeInForce.IOC),
-                new OKExLimitOrderType(TimeInForce.Default, TimeInForce.FOK, TimeInForce.IOC),
-                new OKExStopMarketOrderType(TimeInForce.Default),
-                new OKExStopLimitOrderType(TimeInForce.Default),
-                new OKExOcoOrderType(TimeInForce.Default),
-                new OKExTriggerMarketOrderType(TimeInForce.Default),
-                new OKExTriggerLimitOrderType(TimeInForce.Default),
+                new OKExMarketOrderType(TimeInForce.Default, TimeInForce.IOC) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExLimitOrderType(TimeInForce.Default, TimeInForce.FOK, TimeInForce.IOC) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExStopMarketOrderType(TimeInForce.Default) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExStopLimitOrderType(TimeInForce.Default) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExOcoOrderType(TimeInForce.Default) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExTriggerMarketOrderType(TimeInForce.Default) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
+                new OKExTriggerLimitOrderType(TimeInForce.Default) { BalanceCalculatorFactory = this.CreateOrderEntryBalanceCalculator },
             };
         }
 
         #endregion Positions and Orders
+
+        #region Trades history
+
+        public override TradesHistoryMetadata GetTradesMetadata() => new TradesHistoryMetadata()
+        {
+            AllowLocalStorage = true
+        };
+        public override IEnumerable<MessageTrade> GetTrades(DateTime from, DateTime to, CancellationToken token, IProgress<float> progress)
+        {
+            var result = new List<MessageTrade>();
+            var history = this.client.GetTransactions(from, to, token, out string error);
+
+            if (!string.IsNullOrEmpty(error))
+                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+
+            if (history?.Length > 0)
+            {
+                foreach (var item in history)
+                {
+                    if (item.HasTradeId)
+                        result.Add(this.CreateTradeMessage(item));
+                }
+            }
+
+            return result;
+        }
+
+        #endregion Trades history
 
         #region Trading opertions
 
@@ -291,20 +325,15 @@ namespace OKExV5Vendor.Trading
 
             string error;
             OKExTradingResponce responce;
+            var tradeMode = parameters.AdditionalParameters.GetVisibleValue<OKExTradeMode>(OKExOrderTypeHelper.TRADE_MODE_TYPE);
 
             if (parameters.OrderTypeId == OrderType.Market || parameters.OrderTypeId == OrderType.Limit)
             {
-                var tradeMode = parameters.AdditionalParameters.GetVisibleValue<OKExTradeMode>(OKExOrderTypeHelper.TRADE_MODE_TYPE);
                 var request = new OKExPlaceOrderRequest(oKExSymbol, tradeMode, parameters.Side.ToOKEx(), parameters.ToOKExOrderType(), oKExSymbol.FormattedQuantity(parameters.Quantity));
+                this.FillGeneralPlaceRequestProperties(request, parameters, tradeMode, oKExSymbol.InstrumentType);
 
-                if (tradeMode == OKExTradeMode.Cross)
-                {
-                    request.MarginCurrency = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.MARGIN_CURRENCY);
-                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
-                }
-
-                if (this.account.PositionMode == OKExPositionMode.LongShort)
-                    request.PositionSide = request.Side.ToPositionSide();
+                request.Tag = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.COMMENT) ?? parameters.Comment;
+                request.ClientOrderId = this.GenerateUniqueClientOrderId();
 
                 if (!double.IsNaN(parameters.Price))
                     request.Price = parameters.Price;
@@ -313,17 +342,8 @@ namespace OKExV5Vendor.Trading
             }
             else
             {
-                var tradeMode = parameters.AdditionalParameters.GetVisibleValue<OKExTradeMode>(OKExOrderTypeHelper.TRADE_MODE_TYPE);
                 var request = new OKExPlaceAlgoOrderRequest(oKExSymbol, tradeMode, parameters.Side.ToOKEx(), parameters.ToOKExAlgoOrderType(), oKExSymbol.FormattedQuantity(parameters.Quantity));
-
-                if (tradeMode == OKExTradeMode.Cross)
-                {
-                    request.MarginCurrency = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.MARGIN_CURRENCY);
-                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
-                }
-
-                if (this.account.PositionMode == OKExPositionMode.LongShort)
-                    request.PositionSide = request.Side.ToPositionSide();
+                this.FillGeneralPlaceRequestProperties(request, parameters, tradeMode, oKExSymbol.InstrumentType);
 
                 if (parameters.OrderTypeId == OrderType.Stop || parameters.OrderTypeId == OrderType.StopLimit)
                 {
@@ -395,7 +415,10 @@ namespace OKExV5Vendor.Trading
                 if (!this.ordersCache.TryGetValue(parameters.OrderId, out var order))
                     return result;
 
-                var request = new OKExAmendOrderRequest(oKExSymbol, order.OrderId);
+                var request = new OKExAmendOrderRequest(oKExSymbol, order.OrderId)
+                {
+                    ClientOrderId = order.ClientOrderId
+                };
 
                 // check new size
                 if (parameters.Quantity != order.Size)
@@ -877,8 +900,12 @@ namespace OKExV5Vendor.Trading
             if (this.account == null)
                 return;
 
+            this.totalBalanceInfo = balance;
+
             foreach (var item in balance.Details)
             {
+                this.balancesCache[item.Currency] = item;
+
                 var message = new MessageCryptoAssetBalances()
                 {
                     AccountId = this.account.Id,
@@ -984,6 +1011,8 @@ namespace OKExV5Vendor.Trading
                 case OKExOrderState.PartiallyFilled:
                 case OKExOrderState.Filled:
                     {
+                        this.PushMessage(this.CreateTradeMessage(order));
+
                         history = this.CreateHistoryMessage(this.CreateOpenOrderMessage(order));
 
                         if (order.State == OKExOrderState.Filled)
@@ -1216,7 +1245,8 @@ namespace OKExV5Vendor.Trading
                 LastUpdateTime = order.UpdateTime,
                 Status = order.State.ToTerminal(),
                 OriginalStatus = order.State.GetEnumMember(),
-                FilledQuantity = order.AccumulatedFillQty ?? default
+                FilledQuantity = order.AccumulatedFillQty ?? default,
+                Comment = order.OrderTag ?? string.Empty
             };
 
             if (order.TakeProfitTriggerPrice.HasValue)
@@ -1370,7 +1400,137 @@ namespace OKExV5Vendor.Trading
                 Status = isModified ? OrderStatus.Modified : message.Status
             };
         }
+        private MessageTrade CreateTradeMessage(OKExOrder order)
+        {
+            var trade = new MessageTrade()
+            {
+                AccountId = this.account.Id,
+                OrderId = order.OrderId,
+                Price = order.LastFilledPrice ?? order.AverageFilledPrice ?? default,
+                Quantity = order.LasFilledQty ?? order.Size ?? default,
+                Side = order.Side.ToTerminal(),
+                OrderTypeId = order.ToTerminalOrderType(),
+                SymbolId = order.UniqueInstrumentId,
+                TradeId = order.LastTradeId?.ToString(),
+                DateTime = order.UpdateTime,               
+            };
+
+            if (order.Fee.HasValue && order.Fee != 0)
+            {
+                trade.Fee = new PnLItem()
+                {
+                    Value = order.Fee.Value,
+                    AssetID = order.FeeCurrency
+                };
+            }
+
+            if (order.PnL.HasValue && order.PnL != 0)
+            {
+                trade.NetPnl = new PnLItem()
+                {
+                    Value = order.PnL.Value,
+                    AssetID = order.Currency,
+                };
+            }
+
+            return trade;
+        }
+        private MessageTrade CreateTradeMessage(OKExTransaction transaction)
+        {
+            var message = new MessageTrade()
+            {
+                AccountId = this.account.Id,
+                OrderId = transaction.OrderId,
+                TradeId = transaction.TradeId,
+                DateTime = transaction.Time,
+                Price = transaction.FillPrice ?? default,
+                Side = transaction.Side.ToTerminal(),
+                SymbolId = transaction.UniqueInstrumentId,
+                Quantity = transaction.FillSize ?? default,
+                Fee = new PnLItem()
+                {
+                    AssetID = transaction.FeeCurrency,
+                    Value = transaction.Fee.Value,
+                },              
+            };
+
+            return message;
+        }
+
+        private void FillGeneralPlaceRequestProperties(OKExPlaceOrderBaseRequest request, PlaceOrderRequestParameters parameters, OKExTradeMode tradeMode, OKExInstrumentType symbolType)
+        {
+            if (tradeMode == OKExTradeMode.Cross)
+                request.MarginCurrency = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.MARGIN_CURRENCY);
+
+            if (tradeMode != OKExTradeMode.Cash)
+            {
+                if (this.account.PositionMode == OKExPositionMode.LongShort && symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
+                {
+                    request.PositionSide = parameters.AdditionalParameters.GetVisibleValue<OKExOrderBehaviourType>(OKExOrderTypeHelper.ORDER_BEHAVIOUR) == OKExOrderBehaviourType.Open
+                        ? request.Side.ToPositionSide()
+                        : request.Side.ToPositionSide().Revers();
+                }
+                else
+                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
+            }
+            else if (symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
+            {
+                if (this.account.PositionMode == OKExPositionMode.LongShort)
+                    request.PositionSide = request.Side.ToPositionSide();
+            }
+        }
+        private string GenerateUniqueClientOrderId()
+        {
+            string clientId = (OKExConsts.BROKER_ID + Guid.NewGuid()).Replace("-", "");
+
+            if (clientId.Length > OKExConsts.MAX_COMMENT_LENGTH)
+                return clientId.Substring(0, OKExConsts.MAX_COMMENT_LENGTH);
+            else
+                return clientId;
+        }
+        private IBalanceCalculator CreateOrderEntryBalanceCalculator() => new OKExOrderEntryBalanceCalculator(this);
 
         #endregion Factory methods
+
+        #region IOKExOrderEntryDataProvider
+
+        IReadOnlyDictionary<string, OKExBalanceItem> IOKExOrderEntryDataProvider.Balances => this.balancesCache;
+        OKExBalance IOKExOrderEntryDataProvider.TotalInfo => this.totalBalanceInfo;
+        OKExAccount IOKExOrderEntryDataProvider.Account => this.account;
+
+        void IOKExOrderEntryDataProvider.PopulateLeverage(OKExSymbol symbol)
+        {
+            if (symbol.InstrumentType == OKExInstrumentType.Index)
+                return;
+
+            if (!symbol.NeedUpdateLeverageData)
+                return;
+
+            symbol.LastLeverageUpdatedTime = Core.Instance.TimeUtils.DateTimeUtcNow;
+
+            Task.Factory.StartNew(() =>
+            {
+                var crossLever = this.client.GetLeverage(symbol, OKExTradeMode.Cross, CancellationToken.None, out string error);
+                foreach (var item in crossLever)
+                    symbol.CrossLeverage[item.PositionSide] = (int)item.Leverage.Value;
+
+                var isoLever = this.client.GetLeverage(symbol, OKExTradeMode.Isolated, CancellationToken.None, out error);
+                foreach (var item in isoLever)
+                    symbol.IsolatedLeverage[item.PositionSide] = (int)item.Leverage.Value;
+
+                this.PushMessage(this.CreateSymbolMessage(symbol, symbol.FundingRate));
+            });
+
+        }
+        public OKExSymbol GetSymbol(string id)
+        {
+            if (this.allSymbolsCache.TryGetValue(id, out var symbol))
+                return symbol;
+            else
+                return null;
+        }
+
+        #endregion IOKExOrderEntryDataProvider
+
     }
 }

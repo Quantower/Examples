@@ -294,12 +294,78 @@ namespace OKExV5Vendor.Market
                     if (keepGoing)
                         keepGoing = candles.Length == 100;
                 }
+
+
+                //
+                //
+                //
+                long lastLoadedTimeTicks = requestParameters.FromTime.Ticks;
+                if (result.Count > 0)
+                {
+                    // для месяца нужно считать по дням
+                    if (requestParameters.Period.BasePeriod == BasePeriod.Month)
+                    {
+                        lastLoadedTimeTicks = result.First().TicksLeft;
+
+                        for (int i = 0; i < requestParameters.Period.PeriodMultiplier; i++)
+                        {
+                            var dateTime = new DateTime(lastLoadedTimeTicks + TimeSpan.TicksPerDay, DateTimeKind.Utc);
+
+                            int daysCount = DateTime.DaysInMonth(dateTime.Year, dateTime.Month);
+
+                            lastLoadedTimeTicks += TimeSpan.TicksPerDay * daysCount;
+                        }
+                    }
+                    else
+                        lastLoadedTimeTicks = result.First().TicksLeft + requestParameters.Period.Ticks;
+                }
+
+                if (lastLoadedTimeTicks + requestParameters.Period.Ticks >= Core.Instance.TimeUtils.DateTimeUtcNow.Ticks)
+                {
+                    var lastBar = this.LoadLastBar(requestParameters, lastLoadedTimeTicks);
+
+                    if (lastBar != null)
+                        result.InsertRange(0, lastBar);
+                }
+
             }
 
-            var sss = result.GroupBy(j => j.TicksLeft).Where(s => s.Count() > 1);
-
-
             return result;
+        }
+
+        private IList<IHistoryItem> LoadLastBar(HistoryRequestParameters requestParameters, long lastLoadedTimeTicks)
+        {
+            // Костя: как так вышло не понятно
+            if (lastLoadedTimeTicks >= requestParameters.ToTime.Ticks)
+                return null;
+
+            if (requestParameters.Period.BasePeriod == BasePeriod.Tick)
+                return null;
+
+            var parametersCopy = requestParameters.Copy;
+            parametersCopy.Aggregation = new HistoryAggregationTime(requestParameters.Period);
+
+            if (requestParameters.Period <= Period.MIN1)
+                parametersCopy.Period = Period.TICK1;
+            else if (requestParameters.Period <= Period.HOUR1)
+                parametersCopy.Period = Period.MIN1;
+            else if (requestParameters.Period <= Period.DAY1)
+                parametersCopy.Period = Period.HOUR1;
+            else
+                parametersCopy.Period = Period.DAY1;
+
+            parametersCopy.FromTime = new DateTime(lastLoadedTimeTicks, DateTimeKind.Utc);
+
+            var baseHistory = this.LoadHistory(parametersCopy);
+
+            if (baseHistory == null || baseHistory.Count == 0)
+                return null;
+
+            var historyProcessor = Core.Instance.HistoryAggregations.CreateHistoryProcessor(parametersCopy);
+            baseHistory = baseHistory.Reverse().ToList();
+            var aggregatedHistory = historyProcessor.AggregateHistory(new HistoryHolder(baseHistory, parametersCopy));
+
+            return aggregatedHistory;
         }
 
         #endregion History
@@ -403,7 +469,7 @@ namespace OKExV5Vendor.Market
         {
             this.PushMessage(new Quote(symbol.UniqueInstrumentId, quote.BidPrice ?? default, quote.BidSize ?? default, quote.AskPrice ?? default, quote.AskSize ?? default, quote.Time));
         }
-        private void Client_OnNewTicker(OKExSymbol symbol, OKExTicker ticker, bool isFirstMessage)
+        private void Client_OnNewTicker(OKExSymbol symbol, OKExTicker ticker, OKExOpenInterest oi, bool isFirstMessage)
         {
             var daybar = new DayBar(symbol.UniqueInstrumentId, ticker.Time);
 
@@ -436,6 +502,9 @@ namespace OKExV5Vendor.Market
 
             if (ticker.Volume24h.HasValue)
                 daybar.Volume = ticker.Volume24h.Value;
+
+            if (oi != null && oi.OpenInterestInCurrency.HasValue)
+                daybar.OpenInterest = oi.OpenInterestInCurrency.Value;
 
             this.PushMessage(daybar);
         }
@@ -508,7 +577,7 @@ namespace OKExV5Vendor.Market
 
         #region Factory methods
 
-        private MessageSymbol CreateSymbolMessage(OKExSymbol symbol)
+        protected MessageSymbol CreateSymbolMessage(OKExSymbol symbol)
         {
             var message = new MessageSymbol(symbol.UniqueInstrumentId)
             {
@@ -521,9 +590,6 @@ namespace OKExV5Vendor.Market
                 ProductAssetId = symbol.ProductAsset,
                 HistoryType = HistoryType.Last,
                 QuotingCurrencyAssetID = symbol.QuottingAsset,
-                LotSize = symbol.LotSize ?? 1,
-                LotStep = symbol.LotSize ?? symbol.ContractMultiplier ?? 1,
-                MinLot = symbol.MinOrderSize ?? 1,
                 ExchangeId = OKExConsts.DEFAULT_EXCHANGE_ID,
                 ExpirationDate = symbol.ExpiryTimeUtc,
                 SymbolType = symbol.InstrumentType.ToTerminal(),
@@ -533,6 +599,19 @@ namespace OKExV5Vendor.Market
                 AllowAbbreviatePriceByTickSize = true,
                 SymbolAdditionalInfo = new List<AdditionalInfoItem>()
             };
+
+            if (symbol.ContractType != OKExContractType.Undefined)
+            {
+                message.MinLot = symbol.MinOrderSize ?? 1;
+                message.LotSize = symbol.LotSize ?? 1;
+                message.LotStep = symbol.ContractMultiplier ?? 1;
+            }
+            else
+            {
+                message.MinLot = Math.Min(symbol.MinOrderSize ?? 1, 1);
+                message.LotSize = symbol.LotSize ?? 1;
+                message.LotStep = message.LotSize;
+            }
 
             if (message.SymbolType == SymbolType.Indexes)
             {
@@ -546,7 +625,8 @@ namespace OKExV5Vendor.Market
             if (message.SymbolType == SymbolType.Futures)
             {
                 message.Root = symbol.Underlier;
-                message.UnderlierId = symbol.Underlier;
+                // alexb: Если указывать, symbol lookup - не ищет futures по полному имени
+                //message.UnderlierId = symbol.Underlier;
             }
 
             if (message.SymbolType == SymbolType.Options)
@@ -556,21 +636,147 @@ namespace OKExV5Vendor.Market
                 message.StrikePrice = symbol.StrikePrice.Value;
                 message.OptionSerieId = message.UnderlierId + "_" + message.ExpirationDate;
             }
-
-            if (symbol.Leverage.HasValue)
+            if (symbol.MinOrderSize.HasValue && symbol.ContractType == OKExContractType.Undefined)
             {
                 message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
-                    Id = "leverage",
-                    NameKey = "Leverage",
-                    ToolTipKey = "Leverage",
-                    DataType = ComparingType.String,
-                    Value = symbol.Leverage.Value.ToString(),
+                    Id = "min_order_size",
+                    NameKey = "Min order size",
+                    ToolTipKey = "Min order size",
+                    DataType = ComparingType.Double,
+                    FormatingType = AdditionalInfoItemFormatingType.CustomAsset,
+                    CustomAssetID = message.ProductAssetId,
+                    Value = symbol.MinOrderSize.Value,
                     SortIndex = 100,
                 });
             }
+            if (symbol.MaxLeverage.HasValue)
+            {
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                {
+                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                    Id = "max_leverage",
+                    NameKey = "Max leverage",
+                    ToolTipKey = "Max leverage",
+                    DataType = ComparingType.Double,
+                    Value = symbol.MaxLeverage.Value,
+                    SortIndex = 100,
+                });
+            }
+            if (symbol.CrossLeverage.Count > 0)
+            {
+                if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Net, out int lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "cross_net_leverage",
+                        NameKey = "Cross net leverage",
+                        ToolTipKey = "Cross net leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
+                if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Short, out lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "cross_short_leverage",
+                        NameKey = "Cross short leverage",
+                        ToolTipKey = "Cross short leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
+                if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Long, out lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "cross_long_leverage",
+                        NameKey = "Cross long leverage",
+                        ToolTipKey = "Cross long leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
+            }
+            if (symbol.IsolatedLeverage.Count > 0)
+            {
+                if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Net, out int lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "Isolated_net_leverage",
+                        NameKey = "Isolated net leverage",
+                        ToolTipKey = "Isolated net leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
+                if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Short, out lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "Isolated_short_leverage",
+                        NameKey = "Isolated short leverage",
+                        ToolTipKey = "Isolated short leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
+                if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Long, out lever))
+                {
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "isolated_long_leverage",
+                        NameKey = "Isolated long leverage",
+                        ToolTipKey = "Isolated long leverage",
+                        DataType = ComparingType.Int,
+                        Value = lever,
+                        SortIndex = 100,
+                    });
+                }
 
+            }
+            if (symbol.ContractType != OKExContractType.Undefined)
+            {
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                {
+                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                    Id = "contract_type",
+                    NameKey = "Contract type",
+                    ToolTipKey = "Contract type",
+                    DataType = ComparingType.String,
+                    Value = symbol.ContractType.GetDescription(),
+                    SortIndex = 100,
+                });
+            }
+            if (symbol.ContractValue.HasValue)
+            {
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                {
+                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                    Id = "contract_value",
+                    NameKey = "Contract value",
+                    ToolTipKey = "Contract value",
+                    DataType = ComparingType.Double,
+                    CustomAssetID = symbol.QuottingAsset,
+                    FormatingType = AdditionalInfoItemFormatingType.CustomAsset,
+                    Value = symbol.ContractValue.Value,
+                    SortIndex = 100,
+                });
+            }
             if (symbol.FutureAlias != OKExFutureAliasType.Undefined)
             {
                 message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
@@ -584,7 +790,6 @@ namespace OKExV5Vendor.Market
                     SortIndex = 100,
                 });
             }
-
             if (symbol.Status != OKExInstrumentStatus.Undefined)
             {
                 message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
@@ -601,51 +806,56 @@ namespace OKExV5Vendor.Market
 
             return message;
         }
-        private MessageSymbol CreateSymbolMessage(OKExSymbol symbol, OKExFundingRate rate)
+        protected MessageSymbol CreateSymbolMessage(OKExSymbol symbol, OKExFundingRate rate)
         {
             var message = this.CreateSymbolMessage(symbol);
 
-            if (message.SymbolAdditionalInfo == null)
-                message.SymbolAdditionalInfo = new List<AdditionalInfoItem>();
+            if (rate != null)
+            {
+                if (message.SymbolAdditionalInfo == null)
+                    message.SymbolAdditionalInfo = new List<AdditionalInfoItem>();
 
-            if (rate.FundingRate.HasValue)
-            {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                symbol.FundingRate = rate;
+
+                if (rate.FundingRate.HasValue)
                 {
-                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
-                    Id = "funding_rate",
-                    NameKey = "Funding rate",
-                    ToolTipKey = "Funding rate",
-                    DataType = ComparingType.Double,
-                    Value = rate.FundingRate.Value,
-                    SortIndex = 100,
-                });
-            }
-            if (rate.NextFundingRate.HasValue)
-            {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "funding_rate",
+                        NameKey = "Funding rate",
+                        ToolTipKey = "Funding rate",
+                        DataType = ComparingType.Double,
+                        Value = rate.FundingRate.Value,
+                        SortIndex = 100,
+                    });
+                }
+                if (rate.NextFundingRate.HasValue)
                 {
-                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
-                    Id = "next_funding_rate",
-                    NameKey = "Next funding rate",
-                    ToolTipKey = "Next funding rate",
-                    DataType = ComparingType.Double,
-                    Value = rate.NextFundingRate.Value,
-                    SortIndex = 100,
-                });
-            }
-            if (rate.FundingTime != default)
-            {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "next_funding_rate",
+                        NameKey = "Next funding rate",
+                        ToolTipKey = "Next funding rate",
+                        DataType = ComparingType.Double,
+                        Value = rate.NextFundingRate.Value,
+                        SortIndex = 100,
+                    });
+                }
+                if (rate.FundingTime != default)
                 {
-                    GroupInfo = OKExConsts.TRADING_INFO_GROUP,
-                    Id = "funding_time",
-                    NameKey = "Funding time",
-                    ToolTipKey = "Funding time",
-                    DataType = ComparingType.DateTime,
-                    Value = rate.FundingTime,
-                    SortIndex = 100,
-                });
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    {
+                        GroupInfo = OKExConsts.TRADING_INFO_GROUP,
+                        Id = "funding_time",
+                        NameKey = "Funding time",
+                        ToolTipKey = "Funding time",
+                        DataType = ComparingType.DateTime,
+                        Value = rate.FundingTime,
+                        SortIndex = 100,
+                    });
+                }
             }
 
             return message;

@@ -4,6 +4,7 @@ using OKExV5Vendor.API;
 using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.REST;
 using OKExV5Vendor.API.REST.Models;
+using OKExV5Vendor.API.Subscriber;
 using OKExV5Vendor.API.Websocket;
 using OKExV5Vendor.API.Websocket.Models;
 using OKExV5Vendor.Market;
@@ -87,6 +88,12 @@ namespace OKExV5Vendor.Trading
 
         #region Data requests
 
+        internal OKExLeverage[] GetLeverage(OKExSymbol symbol, OKExTradeMode mode, CancellationToken token, out string error)
+        {
+            var responce = this.SendPrivateGetRequest<OKExLeverage[]>(this.settings.RestEndpoint, $"/api/v5/account/leverage-info?instId={symbol.OKExInstrumentId}&mgnMode={mode.GetEnumMember()}", token);
+            error = responce.Message;
+            return responce.Data ?? new OKExLeverage[0];
+        }
         internal OKExBalance[] GetBalance(CancellationToken token, out string error)
         {
             var responce = this.SendPrivateGetRequest<OKExBalance[]>(this.settings.RestEndpoint, "/api/v5/account/balance", token);
@@ -281,6 +288,33 @@ namespace OKExV5Vendor.Trading
 
             var items = this.PaginationLoaderWithRange(
                 (afterId) => this.GetWithdrawalHistory(string.Empty, afterId, token, out innerErrorMessage),
+                fromDateTime,
+                toDateTime);
+
+            error = innerErrorMessage;
+            return items;
+        }
+        internal OKExTransaction[] GetTransactions(string afterId, CancellationToken token, out string error)
+        {
+            var parameters = new List<string>();
+
+            if (!string.IsNullOrEmpty(afterId))
+                parameters.Add($"after={afterId}");
+
+            string requestPath = $"/api/v5/trade/fills";
+            if (parameters.Count > 0)
+                requestPath += $"?{string.Join("&", parameters)}";
+
+            var responce = this.SendPrivateGetRequest<OKExTransaction[]>(this.settings.RestEndpoint, requestPath, token);
+            error = responce.Message;
+            return responce.Data ?? new OKExTransaction[0];
+        }
+        internal OKExTransaction[] GetTransactions(DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        {
+            string innerErrorMessage = string.Empty;
+
+            var items = this.PaginationLoaderWithRange(
+                (afterId) => this.GetTransactions(afterId, token, out innerErrorMessage),
                 fromDateTime,
                 toDateTime);
 

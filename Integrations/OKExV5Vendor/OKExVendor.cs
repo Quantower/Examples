@@ -27,7 +27,7 @@ namespace OKExV5Vendor
             VendorName = OKExConsts.VENDOR_NAME,
             GetDefaultConnections = () => new List<ConnectionInfo>
             {
-                CreateDefaultConnectionInfo(OKExConsts.VENDOR_NAME, OKExConsts.VENDOR_NAME, Path.Combine("OKExVendor", "okex.svg"),null, false)
+                CreateDefaultConnectionInfo(OKExConsts.VENDOR_NAME, OKExConsts.VENDOR_NAME, Path.Combine("OKExV5Vendor", "okex.svg"),null,  true)
             },
             GetConnectionParameters = () =>
             {
@@ -44,17 +44,17 @@ namespace OKExV5Vendor
                             new SettingItemRadioLocalized(CONNECTION, infoItem, new List<SelectItem> { infoItem, tradingItem }),
                             new SettingItemString(OKExConsts.PARAMETER_API_KEY, string.Empty)
                             {
-                                Text = loc.key("Apikey"),
+                                Text = loc.key("API key"),
                                 Relation = relation
                             },
                             new SettingItemPassword(OKExConsts.PARAMETER_SECRET_ID, new PasswordHolder())
                             {
-                                Text = loc.key("Secret"),
+                                Text = loc.key("Secret key"),
                                 Relation = relation
                             },
                             new SettingItemPassword(OKExConsts.PARAMETER_PASSPHRASE_ID, new PasswordHolder())
                             {
-                                Text = loc.key("Passphrase"),
+                                Text = loc.key("Password"),
                                 Relation = relation
                             }
                         })
@@ -201,5 +201,12 @@ namespace OKExV5Vendor
         public override Report GenerateReport(ReportRequestParameters reportRequestParameters) => this.currentVendor?.GenerateReport(reportRequestParameters);
 
         #endregion Reports
+
+        #region Trades history
+
+        public override TradesHistoryMetadata GetTradesMetadata() => this.currentVendor?.GetTradesMetadata();
+        public override IEnumerable<MessageTrade> GetTrades(System.DateTime from, System.DateTime to, CancellationToken token, System.IProgress<float> progress) => this.currentVendor?.GetTrades(from, to, token, progress);
+
+        #endregion Trades history
     }
 }

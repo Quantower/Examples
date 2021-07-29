@@ -22,7 +22,7 @@ namespace OKExV5Vendor.Market
 
     internal delegate void OKExTradeReceiveEvent(OKExSymbol symbol, OKExTradeItem trade);
     internal delegate void OKExMarkReceiveEvent(OKExSymbol symbol, OKExMarkItem mark);
-    internal delegate void OKExTickerReceiveEvent(OKExSymbol symbol, OKExTicker tiker, bool isFirstMessage);
+    internal delegate void OKExTickerReceiveEvent(OKExSymbol symbol, OKExTicker tiker, OKExOpenInterest oi, bool isFirstMessage);
     internal delegate void OKExIndexTickerReceiveEvent(OKExSymbol symbol, OKExIndexTicker tiker, bool isFirstMessage);
     internal delegate void OKExQuoteReceiveEvent(OKExSymbol symbol, IOKExQuote quote);
     internal delegate void OKExIndexPriceReceiveEvent(OKExSymbol symbol, IOKExIndexPrice indexPrice);
@@ -162,7 +162,7 @@ namespace OKExV5Vendor.Market
                 channels.Add(new OKExChannelRequest()
                 {
                     InstrumentId = f.OKExInstrumentId,
-                    ChannelName = "funding-rate"
+                    ChannelName = OKExChannels.FUNDING_RATE
                 });
             }
 
@@ -185,9 +185,15 @@ namespace OKExV5Vendor.Market
             if (okexSubscriber.SubscriptionCount == 0)
             {
                 okexSubscriber.AddSubscription(OKExSubscriptionType.Ticker);
-
                 if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out string channelName))
                     args.Add(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
+
+                if (okexSubscriber.Symbol.InstrumentType != OKExInstrumentType.Spot)
+                {
+                    okexSubscriber.AddSubscription(OKExSubscriptionType.OpenInterest);
+                    if (symbol.TryGetChannelName(OKExSubscriptionType.OpenInterest, out channelName))
+                        args.Add(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
+                }
             }
 
             if (!okexSubscriber.ContainsSubscription(type))
@@ -221,10 +227,9 @@ namespace OKExV5Vendor.Market
                 });
             }
 
-            if (okexSubscriber.SubscriptionCount == 1 && okexSubscriber.ContainsSubscription(OKExSubscriptionType.Ticker))
+            if (!okexSubscriber.ContainsAnyMainSubscription())
             {
                 okexSubscriber.RemoveChannel(OKExSubscriptionType.Ticker);
-
                 if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out channelName))
                 {
                     channelArgs.Add(new OKExChannelRequest()
@@ -232,6 +237,19 @@ namespace OKExV5Vendor.Market
                         ChannelName = channelName,
                         InstrumentId = symbol.OKExInstrumentId
                     });
+                }
+
+                if (symbol.InstrumentType != OKExInstrumentType.Spot)
+                {
+                    okexSubscriber.RemoveChannel(OKExSubscriptionType.OpenInterest);
+                    if (symbol.TryGetChannelName(OKExSubscriptionType.OpenInterest, out channelName))
+                    {
+                        channelArgs.Add(new OKExChannelRequest()
+                        {
+                            ChannelName = channelName,
+                            InstrumentId = symbol.OKExInstrumentId
+                        });
+                    }
                 }
 
                 this.subscriberCache.Remove(symbol.OKExInstrumentId);
@@ -311,10 +329,6 @@ namespace OKExV5Vendor.Market
 
             switch (jObject.SelectToken("event")?.ToString())
             {
-                case "subscribe":
-                    {
-                        break;
-                    }
                 case OKExConsts.ERROR:
                     {
                         if (jObject.SelectToken("msg")?.ToString() is string msg)
@@ -349,7 +363,7 @@ namespace OKExV5Vendor.Market
                                     var isFirstMessage = subscriber.LastTicker == null;
 
                                     if (subscriber.TryUpdateTicker(ticker, out bool isQuoteChanged))
-                                        this.OnNewTicker(subscriber.Symbol, ticker, isFirstMessage);
+                                        this.OnNewTicker(subscriber.Symbol, ticker, subscriber.OpenInterest, isFirstMessage);
 
                                     if (isQuoteChanged)
                                         this.OnNewQuote?.Invoke(subscriber.Symbol, ticker);
@@ -435,6 +449,15 @@ namespace OKExV5Vendor.Market
 
                             foreach (var rate in rates)
                                 this.OnFundingRateUpdated?.Invoke(rate);
+                            break;
+                        }
+                    case OKExChannels.OPEN_INTEREST:
+                        {
+                            var oi = data.ToObject<OKExOpenInterest[]>().FirstOrDefault();
+
+                            if (oi != null && this.subscriberCache.TryGetValue(instrumentId, out var subscriber))
+                                subscriber.OpenInterest = oi;
+
                             break;
                         }
                 }

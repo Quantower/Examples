@@ -20,11 +20,16 @@ namespace OKExV5Vendor.API.OrderType
             if (parameters.Type == RequestType.PlaceOrder)
             {
                 if (parameters.Symbol.SymbolType != SymbolType.Options)
+                {
                     OKExOrderTypeHelper.AddTradeMode(parameters, settings);
 
-                if (parameters.Symbol.SymbolType == SymbolType.Crypto)
-                    OKExOrderTypeHelper.AddReduceOnly(settings);
+                    if (parameters.Symbol.SymbolType == SymbolType.Crypto)
+                        OKExOrderTypeHelper.AddReduceOnly(settings);
+                    else
+                        OKExOrderTypeHelper.AddOrderBehaviour(settings);
+                }
 
+                OKExOrderTypeHelper.AddComment(settings, string.Empty);
                 OKExOrderTypeHelper.AddPostOnly(settings);
             }
 

@@ -1,6 +1,4 @@
 using Newtonsoft.Json;
-using OKExV5Vendor.API;
-using OKExV5Vendor.API.REST.Models;
 
 namespace OKExV5Vendor.API.REST.Models
 {
@@ -8,6 +6,12 @@ namespace OKExV5Vendor.API.REST.Models
     {
         [JsonProperty("px")]
         public double? Price { get; set; }
+
+        [JsonProperty("tag")]
+        public string Tag { get; set; }
+
+        [JsonProperty("clOrdId")]
+        public string ClientOrderId { get; set; }
 
         public OKExPlaceOrderRequest(OKExSymbol symbol, OKExTradeMode tradeMode, OKExSide side, OKExOrderType orderType, string size)
             : base(symbol, tradeMode, side, orderType, size)

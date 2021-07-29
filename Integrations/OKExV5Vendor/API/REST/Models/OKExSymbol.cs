@@ -1,7 +1,10 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OKExV5Vendor.API.REST.JsonConverters;
+using OKExV5Vendor.API.Websocket.Models;
 using System;
+using System.Collections.Generic;
+using TradingPlatform.BusinessLayer;
 
 namespace OKExV5Vendor.API.REST.Models
 {
@@ -47,7 +50,7 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("settleCcy")]
         public string SettlementCurrency { get; set; }
 
-        [JsonConverter(typeof(JsonStringToDoubleOrDefaultConverter))]
+        //[JsonConverter(typeof(JsonStringToDoubleOrDefaultConverter))]
         [JsonProperty("ctVal")]
         public double? ContractValue { get; set; }
 
@@ -78,7 +81,7 @@ namespace OKExV5Vendor.API.REST.Models
 
         [JsonConverter(typeof(JsonStringToDoubleOrDefaultConverter))]
         [JsonProperty("lever")]
-        public double? Leverage { get; set; }
+        public double? MaxLeverage { get; set; }
 
         [JsonConverter(typeof(JsonStringToDoubleOrDefaultConverter))]
         [JsonProperty("tickSz")]
@@ -135,6 +138,13 @@ namespace OKExV5Vendor.API.REST.Models
             this.IsInverseContractSymbol = this.ContractType == OKExContractType.Inverse && (this.InstrumentType == OKExInstrumentType.Futures || this.InstrumentType == OKExInstrumentType.Swap || this.InstrumentType == OKExInstrumentType.Option);
             this.HasUnderlier = !string.IsNullOrEmpty(this.Underlier);
         }
+
+        internal bool NeedUpdateLeverageData => Core.Instance.TimeUtils.DateTimeUtcNow - this.LastLeverageUpdatedTime >= TimeSpan.FromMinutes(1);
+        internal DateTime LastLeverageUpdatedTime { get; set; }
+
+        internal IDictionary<OKExPositionSide, int> CrossLeverage { get; } = new Dictionary<OKExPositionSide, int>();
+        internal IDictionary<OKExPositionSide, int> IsolatedLeverage { get; } = new Dictionary<OKExPositionSide, int>();
+        internal OKExFundingRate FundingRate { get; set; }
 
         public override string ToString()
         {

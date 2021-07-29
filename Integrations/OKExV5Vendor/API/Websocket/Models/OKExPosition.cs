@@ -2,11 +2,11 @@ using Newtonsoft.Json;
 using OKExV5Vendor.API.REST.JsonConverters;
 using OKExV5Vendor.API.REST.Models;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Reflection;
 
 namespace OKExV5Vendor.API.Websocket.Models
 {
+    [Obfuscation(Exclude = true)]
     class OKExPosition : OKExSymbolBasedObject
     {
         [JsonProperty("instType", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]

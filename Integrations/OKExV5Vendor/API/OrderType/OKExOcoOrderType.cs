@@ -27,22 +27,24 @@ namespace OKExV5Vendor.API.OrderType
 
         public override double GetFillPrice(OrderRequestParameters parameters)
         {
-            return double.NaN;
+            return default;
         }
 
         public override IList<SettingItem> GetOrderSettings(OrderRequestParameters parameters, FormatSettings formatSettings)
         {
-            var settings = new List<SettingItem>();
+            var settings = base.GetOrderSettings(parameters, formatSettings);
 
             if (parameters.Symbol.SymbolType != SymbolType.Options)
             {
                 OKExOrderTypeHelper.AddTradeMode(parameters, settings);
                 OKExOrderTypeHelper.AddTakeProfit(parameters, settings);
                 OKExOrderTypeHelper.AddStopLoss(parameters, settings);
-            }
 
-            if (parameters.Symbol.SymbolType == SymbolType.Crypto)
-                OKExOrderTypeHelper.AddReduceOnly(settings);
+                if (parameters.Symbol.SymbolType == SymbolType.Crypto)
+                    OKExOrderTypeHelper.AddReduceOnly(settings);
+                else if (parameters.Symbol.SymbolType != SymbolType.Options)
+                    OKExOrderTypeHelper.AddOrderBehaviour(settings);
+            }
 
             return settings;
         }

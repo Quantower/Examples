@@ -1,8 +1,10 @@
 using Newtonsoft.Json;
 using OKExV5Vendor.API.REST.JsonConverters;
+using System.Reflection;
 
 namespace OKExV5Vendor.API.Websocket.Models
 {
+    [Obfuscation(Exclude = true)]
     class OKExAccount
     {
         [JsonProperty("uid")]

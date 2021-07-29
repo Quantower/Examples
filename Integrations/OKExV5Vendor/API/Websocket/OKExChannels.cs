@@ -10,6 +10,7 @@ namespace OKExV5Vendor.API.Websocket
 
         public const string INSTRUMENTS = "instruments";
         public const string FUNDING_RATE = "funding-rate";
+        public const string OPEN_INTEREST = "open-interest";
 
         public const string ORDERS = "orders";
         public const string ALGO_ORDERS = "orders-algo";

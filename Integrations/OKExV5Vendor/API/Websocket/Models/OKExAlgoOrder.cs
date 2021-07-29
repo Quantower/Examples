@@ -2,10 +2,12 @@ using Newtonsoft.Json;
 using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.REST.JsonConverters;
 using OKExV5Vendor.API.REST.Models;
+using System.Reflection;
 using System;
 
 namespace OKExV5Vendor.API.Websocket.Models
 {
+    [Obfuscation(Exclude = true)]
     class OKExAlgoOrder : OKExSymbolBasedObject, IPaginationLoadingItemWithTime
     {
         internal const int MARKET_PRICE_INDICATOR = -1;

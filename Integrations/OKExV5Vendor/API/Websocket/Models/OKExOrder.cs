@@ -3,9 +3,11 @@ using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.REST.JsonConverters;
 using OKExV5Vendor.API.REST.Models;
 using System;
+using System.Reflection;
 
 namespace OKExV5Vendor.API.Websocket.Models
 {
+    [Obfuscation(Exclude = true)]
     class OKExOrder : OKExSymbolBasedObject, IPaginationLoadingItemWithTime
     {
         [JsonProperty("instType", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]

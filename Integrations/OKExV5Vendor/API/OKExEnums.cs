@@ -1,10 +1,12 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace OKExV5Vendor.API
 {
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExInstrumentType
     {
@@ -23,6 +25,7 @@ namespace OKExV5Vendor.API
         Index
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExOptionType
     {
@@ -33,16 +36,20 @@ namespace OKExV5Vendor.API
         Put,
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExContractType
     {
         Undefined = 0,
+        [Description("Linear")]
         [EnumMember(Value = "linear")]
         Linear,
+        [Description("Inverse")]
         [EnumMember(Value = "inverse")]
         Inverse,
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExFutureAliasType
     {
@@ -61,6 +68,7 @@ namespace OKExV5Vendor.API
         NextQuarter
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExInstrumentStatus
     {
@@ -75,6 +83,7 @@ namespace OKExV5Vendor.API
         PreOpen,
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExCandlePeriod
     {
         Tick1,
@@ -112,6 +121,7 @@ namespace OKExV5Vendor.API
         Year1,
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExHistoryType
     {
@@ -119,6 +129,7 @@ namespace OKExV5Vendor.API
         Mark
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExSide
     {
@@ -128,6 +139,7 @@ namespace OKExV5Vendor.API
         Sell
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExPositionSide
     {
@@ -139,6 +151,7 @@ namespace OKExV5Vendor.API
         Net
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExTradeMode
     {
@@ -150,15 +163,18 @@ namespace OKExV5Vendor.API
         Isolated
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExSubscriptionType
     {
         Last,
         Mark,
         Quote,
         Level2,
-        Ticker
+        Ticker,
+        OpenInterest
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExOrderType
     {
@@ -176,6 +192,7 @@ namespace OKExV5Vendor.API
         OptLimitIOC,
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExAccountLevel
     {
         [Description("Undefined")]
@@ -188,6 +205,7 @@ namespace OKExV5Vendor.API
         MultiCurrencyMargin
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExPositionMode
     {
@@ -199,6 +217,7 @@ namespace OKExV5Vendor.API
         Net,
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExGreeksType
     {
@@ -208,6 +227,7 @@ namespace OKExV5Vendor.API
         BS
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExAlgoOrderType
     {
@@ -219,6 +239,7 @@ namespace OKExV5Vendor.API
         Trigger
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExOrderState
     {
@@ -233,6 +254,7 @@ namespace OKExV5Vendor.API
         Filled
     }
 
+    [Obfuscation(Exclude = true)]
     [JsonConverter(typeof(StringEnumConverter))]
     enum OKExAlgoOrderState
     {
@@ -246,12 +268,14 @@ namespace OKExV5Vendor.API
         OrderFailed
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExSLTPType
     {
         Market,
         Limit
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExDepositState
     {
         [Description("Undefined")]
@@ -264,6 +288,7 @@ namespace OKExV5Vendor.API
         Successful
     }
 
+    [Obfuscation(Exclude = true)]
     enum OKExWithdrawalState
     {
         [Description("Undefined")]
@@ -286,5 +311,12 @@ namespace OKExV5Vendor.API
         AwaitingManualVerification = 4,
         [Description("Awaiting identity verification")]
         AwaitingIdentityVerification = 5,
+    }
+
+    [Obfuscation(Exclude = true)]
+    enum OKExOrderBehaviourType
+    {
+        Open,
+        Close
     }
 }

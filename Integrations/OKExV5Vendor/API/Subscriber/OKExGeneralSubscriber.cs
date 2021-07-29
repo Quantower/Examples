@@ -1,10 +1,13 @@
 using OKExV5Vendor.API.REST.Models;
+using OKExV5Vendor.API.Websocket.Models;
 using System;
 
 namespace OKExV5Vendor.API.Subscriber
 {
     class OKExGeneralSubscriber : OKExSubscriberBase<OKExTicker>
     {
+        public OKExOpenInterest OpenInterest { get; internal set; }
+
         public OKExGeneralSubscriber(OKExSymbol symbol)
             : base(symbol) { }
 
@@ -35,6 +38,14 @@ namespace OKExV5Vendor.API.Subscriber
 
             this.LastTicker = ticker;
             return needUpdateDaybar;
+        }
+
+        internal bool ContainsAnyMainSubscription()
+        {
+            if (this.Symbol.InstrumentType == OKExInstrumentType.Spot)
+                return !(this.ContainsSubscription(OKExSubscriptionType.Ticker) && this.SubscriptionCount == 1);
+            else
+                return !(this.ContainsSubscription(OKExSubscriptionType.Ticker) && this.ContainsSubscription(OKExSubscriptionType.OpenInterest) && this.SubscriptionCount == 2);
         }
     }
 }

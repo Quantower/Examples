@@ -18,10 +18,14 @@ namespace OKExV5Vendor.API.OrderType
             var settings = base.GetOrderSettings(parameters, formatSettings);
 
             if (parameters.Symbol.SymbolType != SymbolType.Options)
+            {
                 OKExOrderTypeHelper.AddTradeMode(parameters, settings);
 
-            if (parameters.Symbol.SymbolType == SymbolType.Crypto)
-                OKExOrderTypeHelper.AddReduceOnly(settings);
+                if (parameters.Symbol.SymbolType == SymbolType.Crypto)
+                    OKExOrderTypeHelper.AddReduceOnly(settings);
+                else if (parameters.Symbol.SymbolType != SymbolType.Options)
+                    OKExOrderTypeHelper.AddOrderBehaviour(settings);
+            }
 
             return settings;
         }

@@ -1,10 +1,8 @@
 using Newtonsoft.Json;
-using OKExV5Vendor.API;
-using OKExV5Vendor.API.REST.Models;
 
 namespace OKExV5Vendor.API.REST.Models
 {
-    abstract class OKExPlaceOrderBaseRequest<T1>
+    abstract class OKExPlaceOrderBaseRequest
     {
         [JsonIgnore()]
         public OKExSymbol Symbol { get; private set; }
@@ -18,9 +16,6 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("side")]
         public OKExSide Side { get; private set; }
 
-        [JsonProperty("ordType")]
-        public T1 OrderType { get; private set; }
-
         [JsonProperty("sz")]
         public string Size { get; private set; }
 
@@ -33,13 +28,24 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("reduceOnly")]
         public bool? ReduceOnly { get; set; }
 
-        public OKExPlaceOrderBaseRequest(OKExSymbol symbol, OKExTradeMode tradeMode, OKExSide side, T1 orderType, string size)
+        public OKExPlaceOrderBaseRequest(OKExSymbol symbol, OKExTradeMode tradeMode, OKExSide side, string size)
         {
             this.Symbol = symbol;
             this.TradeMode = tradeMode;
             this.Side = side;
-            this.OrderType = orderType;
             this.Size = size;
+        }
+
+    }
+    abstract class OKExPlaceOrderBaseRequest<TOrderType> : OKExPlaceOrderBaseRequest
+    {
+        [JsonProperty("ordType")]
+        public TOrderType OrderType { get; private set; }
+
+        public OKExPlaceOrderBaseRequest(OKExSymbol symbol, OKExTradeMode tradeMode, OKExSide side, TOrderType orderType, string size)
+            : base(symbol, tradeMode, side, size)
+        {
+            this.OrderType = orderType;
         }
     }
 }

@@ -13,8 +13,11 @@ namespace OKExV5Vendor
 {
     class OKExConsts
     {
-        public const string VENDOR_NAME = "OKEx V5";
+        public const string VENDOR_NAME = "OKEx";
         public const string DEFAULT_EXCHANGE_ID = "1";
+
+        public const int MAX_COMMENT_LENGTH = 32;
+        public const string BROKER_ID = "8813794bd2ee4eBC";
 
         public const string ORDER_BOOK_SNAPSHOT = "snapshot";
         public const string ORDER_BOOK_UPDATE = "update";
@@ -28,7 +31,7 @@ namespace OKExV5Vendor
         public const string GENERAL_GROUP = "#10.General";
         public const string TRADING_INFO_GROUP = "#20.Trading info";
         public const string ACCOUNT_ACTIVITY_GROUP = "#40.Account activity";
-        
+
         public const string REPORT_TYPE_PARAMETER_ALGO_ORDER_TYPE = "Algo order type";
         public const string REPORT_TYPE_PARAMETER_ALGO_ORDER_STATE = "Algo order state";
 
@@ -63,7 +66,7 @@ namespace OKExV5Vendor
             { Period.HOUR6, OKExCandlePeriod.Hour6 },
             { Period.HOUR12, OKExCandlePeriod.Hour12 },
             { Period.DAY1, OKExCandlePeriod.Day1 },
-            { Period.WEEK1, OKExCandlePeriod.Week1 },
+            //{ Period.WEEK1, OKExCandlePeriod.Week1 },
             { Period.MONTH1, OKExCandlePeriod.Month1 },
             { new Period(BasePeriod.Month, 3), OKExCandlePeriod.Month3 },
             { new Period(BasePeriod.Month, 6), OKExCandlePeriod.Month6 },
@@ -83,6 +86,20 @@ namespace OKExV5Vendor
                 _ => throw new ArgumentException($"Unsupported symbol type - {type}"),
             };
         }
+        public static OKExInstrumentType ToOKEx(this SymbolType type)
+        {
+            return type switch
+            {
+                SymbolType.Crypto => OKExInstrumentType.Spot,
+                SymbolType.Swap => OKExInstrumentType.Swap,
+                SymbolType.Futures => OKExInstrumentType.Futures,
+                SymbolType.Options => OKExInstrumentType.Option,
+                SymbolType.Indexes => OKExInstrumentType.Index,
+
+                _ => throw new ArgumentException($"Unsupported symbol type - {type}"),
+            };
+        }
+
         public static OptionType ToTerminal(this OKExOptionType type)
         {
             return type switch
@@ -196,6 +213,16 @@ namespace OKExV5Vendor
                 _ => throw new ArgumentException($"Unsupported okex side - {oKExSide}"),
             };
         }
+        public static OKExPositionSide Revers(this OKExPositionSide oKExPositionSide)
+        {
+            return oKExPositionSide switch
+            {
+                OKExPositionSide.Long => OKExPositionSide.Short,
+                OKExPositionSide.Short => OKExPositionSide.Long,
+
+                _ => OKExPositionSide.Net,
+            };
+        }
         public static OKExCandlePeriod ToOKEx(this Period period)
         {
             if (periodMapper.TryGetDirect(period, out var okexPeriod))
@@ -230,7 +257,7 @@ namespace OKExV5Vendor
         {
             if (parameters.OrderTypeId == OrderType.Limit)
             {
-                bool postOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
+                bool postOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.POST_ONLY);
 
                 if (postOnly)
                     return OKExOrderType.PostOnly;
@@ -289,7 +316,7 @@ namespace OKExV5Vendor
             if (newQty < symbol.LotSize)
                 newQty = symbol.LotSize.Value;
 
-            return newQty.ToString(CultureInfo.InvariantCulture);
+            return ((decimal)newQty).ToString(CultureInfo.InvariantCulture);
         }
 
         public static double ConvertSizeToBaseCurrency(this OKExSymbol symbol, OKExTradeItem tradeItem)
@@ -361,6 +388,9 @@ namespace OKExV5Vendor
                             channelName = OKExChannels.TICKERS;
                         break;
                     }
+                case OKExSubscriptionType.OpenInterest:
+                    channelName = OKExChannels.OPEN_INTEREST;
+                    break;
             }
 
             return channelName != null;
