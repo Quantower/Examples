@@ -335,7 +335,6 @@ namespace OKExV5Vendor.Market
 
         private IList<IHistoryItem> LoadLastBar(HistoryRequestParameters requestParameters, long lastLoadedTimeTicks)
         {
-            // Костя: как так вышло не понятно
             if (lastLoadedTimeTicks >= requestParameters.ToTime.Ticks)
                 return null;
 
