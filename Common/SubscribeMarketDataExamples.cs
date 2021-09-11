@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
+
+using System.Collections.Generic;
 using System.Linq;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
@@ -65,8 +67,7 @@ namespace ApiExamples
             }
 
             // Get market depth info from symbol
-            Level2Collection bidsDepth = symbol.Bids;
-            Level2Collection asksDepth = symbol.Asks;
+            var depthOfMarket = symbol.DepthOfMarket.GetDepthOfMarketAggregatedCollections();
         }
 
         private static void Symbol_NewLast(Symbol symbol, Last last)
