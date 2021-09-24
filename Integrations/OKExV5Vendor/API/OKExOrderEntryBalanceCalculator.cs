@@ -97,6 +97,8 @@ namespace OKExV5Vendor.API
             }
         }
 
+        private SettingItemDouble quantitySI;
+
         protected bool IsSpotSymbol { get; private set; }
         protected bool IsContractBasedSymbol { get; set; }
         protected bool IsMarketBasedOrder => this.RequestParameters?.OrderTypeId != null && (this.RequestParameters.OrderTypeId == TradingPlatform.BusinessLayer.OrderType.Market || this.RequestParameters.OrderTypeId == TradingPlatform.BusinessLayer.OrderType.Stop || this.RequestParameters.OrderTypeId == OKExTriggerMarketOrderType.ID);
@@ -138,6 +140,9 @@ namespace OKExV5Vendor.API
             this.tradeMode = orderSettings.GetItemByName(OKExOrderTypeHelper.TRADE_MODE_TYPE) as SettingItemSelectorLocalized;
             this.MarginCurrency = orderSettings.GetItemByName(OKExOrderTypeHelper.MARGIN_CURRENCY) as SettingItemSelector;
 
+            this.quantitySI = orderSettings?.GetItemByName(TradingPlatform.BusinessLayer.OrderType.QUANTITY) as SettingItemDouble;
+            this.PopulateQuantityDimension();
+
             this.CurrentSymbol = requestParameters.Symbol;
             this.CurrentAccount = requestParameters.Account;
 
@@ -146,6 +151,11 @@ namespace OKExV5Vendor.API
             this.PopulateTotal(requestParameters);
             this.UpdateTotal(this.GetQuantity());
             this.UpdateTotalLink();
+        }
+        public override void Dispose()
+        {
+            this.quantitySI = null;
+            base.Dispose();
         }
         protected override Asset GetTotalAsset() => this.TotalAsset;
         protected override double CalculateQuantity(double total, double fillPrice)
@@ -201,15 +211,14 @@ namespace OKExV5Vendor.API
                 if (this.TotalAsset == this.BalanceAsset)
                 {
                     if (this.GetTotal() is var total)
-                        return (ulong)(total * 100 / availableBalance);
+                        return (ulong)(total * 100 * TradingPlatform.BusinessLayer.OrderType.BALANCE_PERCENT_STEPS_COUNT_MULTIPLIER / availableBalance);
                 }
                 else
                 {
                     if (this.GetQuantity() is var quantity)
-                        return (ulong)(quantity * 100 / availableBalance);
+                        return (ulong)(quantity * 100 * TradingPlatform.BusinessLayer.OrderType.BALANCE_PERCENT_STEPS_COUNT_MULTIPLIER / availableBalance);
                 }
             }
-
 
             return base.CalculateSliderStep();
         }
@@ -252,17 +261,17 @@ namespace OKExV5Vendor.API
         }
         protected override void OnPercentChanged()
         {
-            if (this.GetAvailableBalanceWithLeverage() is double availableBalance && this.GetSliderStep() is ulong step)
+            if (this.GetAvailableBalanceWithLeverage() is double availableBalance && this.GetSliderPercent() is double sliderPercent)
             {
                 if (this.TotalAsset == this.BalanceAsset)
                 {
-                    double total = availableBalance * step / 100;
+                    double total = availableBalance * sliderPercent / 100;
                     this.UpdateQuantity(total);
                     this.UpdateTotal(this.GetQuantity());
                 }
                 else
                 {
-                    var qty = availableBalance * step / 100;
+                    var qty = availableBalance * sliderPercent / 100;
                     this.UpdateTotal(qty);
                     this.UpdateQuantity(this.GetTotal());
                 }
@@ -350,10 +359,8 @@ namespace OKExV5Vendor.API
                             else
                                 this.BalanceAsset = this.CurrentSymbol.Product;
 
-                            if (this.IsMarketBasedOrder)
-                                this.TotalAsset = this.BalanceAsset == this.CurrentSymbol.Product ? this.CurrentSymbol.QuotingCurrency : this.CurrentSymbol.Product;
-                            else
-                                this.TotalAsset = this.CurrentSymbol.QuotingCurrency;
+                            this.TotalAsset = this.CurrentSymbol.QuotingCurrency;
+
                             break;
                         }
                     case OKExTradeMode.Cross:
@@ -394,6 +401,22 @@ namespace OKExV5Vendor.API
                 this.TotalAsset = null;
                 this.BalanceAsset = null;
             }
+
+            //
+            this.PopulateQuantityDimension();
+        }
+        private void PopulateQuantityDimension()
+        {
+            if (this.quantitySI == null)
+                return;
+
+            if (!this.IsSpotSymbol)
+                return;
+
+            if (this.TotalAsset == this.CurrentSymbol.Product)
+                this.quantitySI.Dimension = this.CurrentSymbol.QuotingCurrency.Name;
+            else
+                this.quantitySI.Dimension = this.CurrentSymbol.Product.Name;
         }
 
         #endregion Misc

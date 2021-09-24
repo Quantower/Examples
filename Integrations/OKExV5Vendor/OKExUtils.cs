@@ -16,7 +16,8 @@ namespace OKExV5Vendor
         public const string VENDOR_NAME = "OKEx";
         public const string DEFAULT_EXCHANGE_ID = "1";
 
-        public const int MAX_COMMENT_LENGTH = 32;
+        public const int MAX_CLIENT_ORDER_ID_LENGTH = 32;
+        public const int MAX_COMMENT_LENGHT = 8;
         public const string BROKER_ID = "8813794bd2ee4eBC";
 
         public const string ORDER_BOOK_SNAPSHOT = "snapshot";

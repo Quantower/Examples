@@ -28,6 +28,9 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("reduceOnly")]
         public bool? ReduceOnly { get; set; }
 
+        [JsonProperty("tgtCcy")]
+        public OKExOrderQuantityType? QuantityType { get; set; }
+
         public OKExPlaceOrderBaseRequest(OKExSymbol symbol, OKExTradeMode tradeMode, OKExSide side, string size)
         {
             this.Symbol = symbol;

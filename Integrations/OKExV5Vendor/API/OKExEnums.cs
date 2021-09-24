@@ -319,4 +319,14 @@ namespace OKExV5Vendor.API
         Open,
         Close
     }
+
+    [Obfuscation(Exclude = true)]
+    [JsonConverter(typeof(StringEnumConverter))]
+    enum OKExOrderQuantityType
+    {
+        [EnumMember(Value = "base_ccy")]
+        BaseCurrency,
+        [EnumMember(Value = "quote_ccy")]
+        QuoteCurrency
+    }
 }

@@ -82,6 +82,23 @@ namespace OKExV5Vendor.Market
 
         #endregion Connection
 
+        #region Accounts and rules
+
+        public override IList<MessageRule> GetRules(CancellationToken token)
+        {
+            var rules = base.GetRules(token);
+
+            rules.Add(new MessageRule
+            {
+                Name = Rule.ALLOW_TRADING,
+                Value = false
+            });
+
+            return rules;
+        }
+
+        #endregion Accounts and rules
+
         #region Symbols
 
         public override MessageSymbolTypes GetSymbolTypes(CancellationToken token)
@@ -335,6 +352,7 @@ namespace OKExV5Vendor.Market
 
         private IList<IHistoryItem> LoadLastBar(HistoryRequestParameters requestParameters, long lastLoadedTimeTicks)
         {
+            // Костя: как так вышло не понятно
             if (lastLoadedTimeTicks >= requestParameters.ToTime.Ticks)
                 return null;
 
@@ -588,6 +606,7 @@ namespace OKExV5Vendor.Market
                 },
                 ProductAssetId = symbol.ProductAsset,
                 HistoryType = HistoryType.Last,
+                LotSize = 1d,
                 QuotingCurrencyAssetID = symbol.QuottingAsset,
                 ExchangeId = OKExConsts.DEFAULT_EXCHANGE_ID,
                 ExpirationDate = symbol.ExpiryTimeUtc,
@@ -602,15 +621,15 @@ namespace OKExV5Vendor.Market
             if (symbol.ContractType != OKExContractType.Undefined)
             {
                 message.MinLot = symbol.MinOrderSize ?? 1;
-                message.LotSize = symbol.LotSize ?? 1;
                 message.LotStep = symbol.ContractMultiplier ?? 1;
             }
             else
             {
                 message.MinLot = Math.Min(symbol.MinOrderSize ?? 1, 1);
-                message.LotSize = symbol.LotSize ?? 1;
-                message.LotStep = message.LotSize;
+                message.LotStep = symbol.LotSize ?? 1;
             }
+
+            message.NotionalValueStep = message.LotStep;
 
             if (message.SymbolType == SymbolType.Indexes)
             {

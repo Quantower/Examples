@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OKExV5Vendor.API;
 using OKExV5Vendor.API.Misc;
+using OKExV5Vendor.API.RateLimit;
 using OKExV5Vendor.API.REST;
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Subscriber;
@@ -32,6 +33,7 @@ namespace OKExV5Vendor.Trading
         private readonly OKExWebSocket privateWebsocket;
 
         private readonly HashSet<string> subscribedTradingChannels;
+        private readonly object sendPrivateRequestLockKey = new();
 
         internal bool IsLogged { get; private set; }
 
@@ -170,19 +172,19 @@ namespace OKExV5Vendor.Trading
             error = responce.Message;
             return responce.Data?.FirstOrDefault();
         }
-        internal OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        internal OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, DateTime fromDateTime, DateTime toDateTime, OKExOrderState? state, CancellationToken token, out string error)
         {
             string innerErrorMessage = string.Empty;
 
             var items = this.PaginationLoaderWithRange(
-                (afterId) => this.GetHistoryOrders(okexSymbol.OKExInstrumentId, okexSymbol.InstrumentType, afterId, token, out innerErrorMessage),
+                (afterId) => this.GetHistoryOrders(okexSymbol, okexSymbol.InstrumentType, state, afterId, token, out innerErrorMessage),
                 fromDateTime,
                 toDateTime);
 
             if (okexSymbol.InstrumentType == OKExInstrumentType.Spot)
             {
                 var items2 = this.PaginationLoaderWithRange(
-                    (afterId) => this.GetHistoryOrders(okexSymbol.OKExInstrumentId, OKExInstrumentType.Margin, afterId, token, out innerErrorMessage),
+                    (afterId) => this.GetHistoryOrders(okexSymbol, OKExInstrumentType.Margin, state, afterId, token, out innerErrorMessage),
                     fromDateTime,
                     toDateTime);
 
@@ -192,7 +194,7 @@ namespace OKExV5Vendor.Trading
             error = innerErrorMessage;
             return items;
         }
-        internal OKExOrder[] GetHistoryOrders(string instrumentId, OKExInstrumentType type, string afterId, CancellationToken token, out string error)
+        private OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, OKExInstrumentType type, OKExOrderState? state, string afterId, CancellationToken token, out string error)
         {
             if (type == OKExInstrumentType.Index || type == OKExInstrumentType.Any)
             {
@@ -200,10 +202,24 @@ namespace OKExV5Vendor.Trading
                 return new OKExOrder[0];
             }
 
-            var requestPath = $"/api/v5/trade/orders-history-archive?instId={instrumentId}&instType={type.GetEnumMember()}";
+            var parameters = new List<string>
+            {
+                $"instType={type.GetEnumMember()}"
+            };
+
+            if (okexSymbol != null)
+                parameters.Add($"instId={okexSymbol.OKExInstrumentId}");
+
+            if (state.HasValue)
+                parameters.Add($"state={state.GetEnumMember()}");
 
             if (!string.IsNullOrEmpty(afterId))
-                requestPath += $"&after={afterId}";
+                parameters.Add($"after={afterId}");
+
+            string requestPath = $"/api/v5/trade/orders-history-archive";
+
+            if (parameters.Count > 0)
+                requestPath += $"?{string.Join("&", parameters)}";
 
             var responce = this.SendPrivateGetRequest<OKExOrder[]>(this.settings.RestEndpoint, requestPath, token);
             error = responce.Message;
@@ -294,14 +310,18 @@ namespace OKExV5Vendor.Trading
             error = innerErrorMessage;
             return items;
         }
-        internal OKExTransaction[] GetTransactions(string afterId, CancellationToken token, out string error)
+        internal OKExTransaction[] GetTransactions(OKExInstrumentType type, string afterId, CancellationToken token, out string error)
         {
-            var parameters = new List<string>();
+            var parameters = new List<string>
+            {
+                $"instType={type.GetEnumMember()}"
+            };
 
             if (!string.IsNullOrEmpty(afterId))
                 parameters.Add($"after={afterId}");
 
-            string requestPath = $"/api/v5/trade/fills";
+            string requestPath = $"/api/v5/trade/fills-history";
+
             if (parameters.Count > 0)
                 requestPath += $"?{string.Join("&", parameters)}";
 
@@ -309,12 +329,14 @@ namespace OKExV5Vendor.Trading
             error = responce.Message;
             return responce.Data ?? new OKExTransaction[0];
         }
-        internal OKExTransaction[] GetTransactions(DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        internal OKExTransaction[] GetTransactions(OKExInstrumentType type, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
         {
             string innerErrorMessage = string.Empty;
 
+            OKExRateLimitManager.TransactionDetails.Wait();
+
             var items = this.PaginationLoaderWithRange(
-                (afterId) => this.GetTransactions(afterId, token, out innerErrorMessage),
+                (afterId) => this.GetTransactions(type, afterId, token, out innerErrorMessage),
                 fromDateTime,
                 toDateTime);
 
@@ -508,17 +530,21 @@ namespace OKExV5Vendor.Trading
         {
             try
             {
-                string timestamp = Core.Instance.TimeUtils.DateTimeUtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-                string sign = OKExSignGenerator.Generate(timestamp, HttpMethod.Get, endpoint, this.secret);
+                lock (this.sendPrivateRequestLockKey)
+                {
+                    string timestamp = Core.Instance.TimeUtils.DateTimeUtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    string sign = OKExSignGenerator.Generate(timestamp, HttpMethod.Get, endpoint, this.secret);
 
-                this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-TIMESTAMP", timestamp);
-                this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-SIGN", sign);
+                    this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-TIMESTAMP", timestamp);
+                    this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-SIGN", sign);
+                }
 
                 var httpResponce = this.httpClient.GetAsync($"{host}{endpoint}", HttpCompletionOption.ResponseHeadersRead, token)?.Result;
 
                 using var stream = httpResponce.Content.ReadAsStreamAsync().Result;
                 using var sr = new StreamReader(stream);
                 using var jr = new JsonTextReader(sr);
+
                 return this.jsonSerializer.Deserialize<OKExRestResponce<T>>(jr);
             }
             catch (Exception ex)
@@ -536,12 +562,16 @@ namespace OKExV5Vendor.Trading
         {
             try
             {
-                var json = JsonConvert.SerializeObject(body, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
-                string timestamp = Core.Instance.TimeUtils.DateTimeUtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-                string sign = OKExSignGenerator.Generate(timestamp, HttpMethod.Post, endpoint + json, this.secret);
+                string json = JsonConvert.SerializeObject(body, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore });
 
-                this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-TIMESTAMP", timestamp);
-                this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-SIGN", sign);
+                lock (this.sendPrivateRequestLockKey)
+                {
+                    string timestamp = Core.Instance.TimeUtils.DateTimeUtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    string sign = OKExSignGenerator.Generate(timestamp, HttpMethod.Post, endpoint + json, this.secret);
+
+                    this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-TIMESTAMP", timestamp);
+                    this.httpClient.DefaultRequestHeaders.TryAddWithoutValidation("OK-ACCESS-SIGN", sign);
+                }
 
                 var httpResponce = this.httpClient.PostAsync($"{host}{endpoint}", new StringContent(json, Encoding.UTF8, "application/json"), token)?.Result;
 
@@ -562,7 +592,7 @@ namespace OKExV5Vendor.Trading
             }
         }
 
-        private T[] PaginationLoader<T>(Func<string, T[]> loadingFunction, int limit = 100) where T: IPaginationLoadingItem
+        private T[] PaginationLoader<T>(Func<string, T[]> loadingFunction, int limit = 100) where T : IPaginationLoadingItem
         {
             return this.PaginationLoaderWithRange(loadingFunction, DateTime.MinValue, DateTime.MaxValue, limit);
         }
@@ -582,23 +612,23 @@ namespace OKExV5Vendor.Trading
 
                 foreach (var item in items)
                 {
-                    if (item is IPaginationLoadingItemWithTime itemWithTime)
+                    if (item.Time < from)
                     {
-                        if (itemWithTime.Time < from)
-                        {
-                            keepGoing = false;
-                            break;
-                        }
-
-                        if (itemWithTime.Time <= to)
-                            itemsCache.Add(item);
+                        keepGoing = false;
+                        break;
                     }
-                    else
+
+                    if (item.Time <= to)
                         itemsCache.Add(item);
                 }
 
                 if (keepGoing && items.Length == limit)
-                    afterId = items[0].AfterId;
+                {
+                    if (items[0].Time > items[1].Time)
+                        afterId = items[items.Length - 1].AfterId;
+                    else
+                        afterId = items[0].AfterId;
+                }
                 else
                     keepGoing = false;
             }

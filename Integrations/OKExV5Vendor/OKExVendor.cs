@@ -16,8 +16,9 @@ namespace OKExV5Vendor
 
         static OKExVendor()
         {
-            SertificateValidator.CheckAssemblyCertificate(typeof(Core).Assembly.Location);
-            SertificateValidator.CheckAssemblyCertificate(typeof(OKExVendor).Assembly.Location);
+            
+
+
         }
 
         #region Integration details

@@ -8,7 +8,7 @@ using System;
 namespace OKExV5Vendor.API.Websocket.Models
 {
     [Obfuscation(Exclude = true)]
-    class OKExAlgoOrder : OKExSymbolBasedObject, IPaginationLoadingItemWithTime
+    class OKExAlgoOrder : OKExSymbolBasedObject, IPaginationLoadingItem
     {
         internal const int MARKET_PRICE_INDICATOR = -1;
 
@@ -94,7 +94,7 @@ namespace OKExV5Vendor.API.Websocket.Models
         #region IPaginationLoadingItem
 
         string IPaginationLoadingItem.AfterId => this.AlgoOrderId;
-        DateTime IPaginationLoadingItemWithTime.Time => this.CreationTime;
+        DateTime IPaginationLoadingItem.Time => this.CreationTime;
 
         #endregion IPaginationLoadingItem
     }

@@ -4,11 +4,12 @@ using OKExV5Vendor.API.REST.JsonConverters;
 using OKExV5Vendor.API.REST.Models;
 using System;
 using System.Reflection;
+using TradingPlatform.BusinessLayer;
 
 namespace OKExV5Vendor.API.Websocket.Models
 {
     [Obfuscation(Exclude = true)]
-    class OKExOrder : OKExSymbolBasedObject, IPaginationLoadingItemWithTime
+    class OKExOrder : OKExSymbolBasedObject, IPaginationLoadingItem
     {
         [JsonProperty("instType", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
         public override OKExInstrumentType InstrumentType { get; set; }
@@ -27,6 +28,10 @@ namespace OKExV5Vendor.API.Websocket.Models
 
         [JsonProperty("tag")]
         public string OrderTag { get; set; }
+
+        [JsonProperty("tgtCcy")]
+        public string TgtCurrency { get; set; }
+        public bool IsTgtEqualToBaseCurrency => this.TgtCurrency == "base_ccy";
 
         [JsonProperty("px", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
         public double? Price { get; set; }
@@ -57,6 +62,7 @@ namespace OKExV5Vendor.API.Websocket.Models
 
         [JsonProperty("tradeId", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
         public double? LastTradeId { get; set; }
+        public string UniqueLastTradeId => $"{this.LastTradeId}_{this.InstrumentType.GetEnumMember().ToLowerInvariant()}";
 
         [JsonProperty("fillSz", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
         public double? LasFilledQty { get; set; }
@@ -107,7 +113,7 @@ namespace OKExV5Vendor.API.Websocket.Models
         #region IPaginationLoadingItem
 
         string IPaginationLoadingItem.AfterId => this.OrderId;
-        DateTime IPaginationLoadingItemWithTime.Time => this.CreationTime;
+        DateTime IPaginationLoadingItem.Time => this.CreationTime;
 
         #endregion IPaginationLoadingItem
     }

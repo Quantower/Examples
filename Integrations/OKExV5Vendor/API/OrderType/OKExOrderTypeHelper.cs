@@ -84,17 +84,24 @@ namespace OKExV5Vendor.API.OrderType
                 Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross), new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated))
             });
         }
-        internal static void AddTradeMode(OrderRequestParameters parameters, IList<SettingItem> settings, OKExTradeMode tradeMode = OKExTradeMode.Cash, int index = 0)
+        internal static void AddTradeMode(OrderRequestParameters parameters, IList<SettingItem> settings, OKExTradeMode? tradeMode = null, int index = 0)
         {
-            settings.Add(new SettingItemSelectorLocalized(TRADE_MODE_TYPE, new SelectItem("", (int)tradeMode), new List<SelectItem>()
-            {
-                new SelectItem(loc._("Cash"), (int)OKExTradeMode.Cash),
-                new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross),
-                new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated),
-            })
+            var isCryptoSymbol = parameters.Symbol.SymbolType == SymbolType.Crypto;
+
+            var items = new List<SelectItem>();
+
+            if (isCryptoSymbol)
+                items.Add(new SelectItem(loc._("Cash"), (int)OKExTradeMode.Cash));
+
+            items.Add(new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross));
+            items.Add(new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated));
+
+            var defaultTradeMode = tradeMode ?? (isCryptoSymbol ? OKExTradeMode.Cash : OKExTradeMode.Cross);
+              
+            settings.Add(new SettingItemSelectorLocalized(TRADE_MODE_TYPE, new SelectItem("", (int)defaultTradeMode), items)
             { Text = loc._("Trade mode"), SortIndex = index });
 
-            if (parameters.Symbol.SymbolType == SymbolType.Crypto)
+            if (isCryptoSymbol)
             {
                 settings.Add(new SettingItemSelector(MARGIN_CURRENCY, parameters.Symbol.Product.Id, new List<string>()
                 {

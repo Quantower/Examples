@@ -18,7 +18,7 @@ namespace OKExV5Vendor.Trading
     {
         #region Parameters
 
-        private const string DEFAULT_ACCOUNT_BALANCE_ASSET = "USDT";
+        private const string DEFAULT_ACCOUNT_BALANCE_ASSET = "USD";
 
         private readonly OKExTradingClient client;
         private OKExAccount account;
@@ -174,6 +174,11 @@ namespace OKExV5Vendor.Trading
 
             rules.Add(new MessageRule()
             {
+                Name = Rule.ALLOW_TRADING,
+                Value = true
+            });
+            rules.Add(new MessageRule()
+            {
                 Name = Rule.ALLOW_SL,
                 Value = false
             });
@@ -253,17 +258,25 @@ namespace OKExV5Vendor.Trading
         }
         public override PnL CalculatePnL(PnLRequestParameters parameters)
         {
-            if (!this.positionsCache.TryGetValue(parameters.PositionId, out var position))
+            if (!this.positionsCache.TryGetValue(parameters.PositionId, out var position) || !this.allSymbolsCache.TryGetValue(position.UniqueInstrumentId, out var symbol))
                 return base.CalculatePnL(parameters);
+
+            var grossPnl = new PnLItem()
+            {
+                AssetID = position.MarginCurrency,
+                Value = position.UnrealizedPnl ?? default,
+            };
+
+            if (symbol.ContractType == OKExContractType.Linear)
+                grossPnl.ValuePercent = position.UnrealizedPnl / (parameters.Symbol.LotSize * parameters.Quantity * symbol.ContractValue * parameters.OpenPrice) ?? default;
+            else if (symbol.ContractType == OKExContractType.Inverse)
+                grossPnl.ValuePercent = position.UnrealizedPnl / (parameters.Symbol.LotSize * parameters.Quantity * symbol.ContractValue / parameters.OpenPrice) ?? default;
+            else
+                grossPnl.ValuePercent = position.UnrealizedPnlRatio.Value;
 
             return new PnL()
             {
-                NetPnL = new PnLItem()
-                {
-                    AssetID = position.MarginCurrency,
-                    Value = position.UnrealizedPnl ?? default,
-                    ValuePercent = position.UnrealizedPnlRatio ?? default
-                }
+                GrossPnL = grossPnl
             };
         }
         public override IList<OrderType> GetAllowedOrderTypes(CancellationToken token)
@@ -291,19 +304,47 @@ namespace OKExV5Vendor.Trading
         public override IEnumerable<MessageTrade> GetTrades(DateTime from, DateTime to, CancellationToken token, IProgress<float> progress)
         {
             var result = new List<MessageTrade>();
-            var history = this.client.GetTransactions(from, to, token, out string error);
 
-            if (!string.IsNullOrEmpty(error))
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
-
-            if (history?.Length > 0)
+            var types = new OKExInstrumentType[]
             {
-                foreach (var item in history)
+                OKExInstrumentType.Spot,
+                OKExInstrumentType.Margin,
+                OKExInstrumentType.Swap,
+                OKExInstrumentType.Futures,
+                OKExInstrumentType.Option
+            };
+
+            for (int i = 0; i < types.Length; i++)
+            {
+                var history = this.client.GetTransactions(types[i], from, to, token, out string error);
+
+                if (token.IsCancellationRequested)
+                    break;
+
+                if (!string.IsNullOrEmpty(error))
                 {
-                    if (item.HasTradeId)
-                        result.Add(this.CreateTradeMessage(item));
+                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                    break;
                 }
+
+                if (history?.Length > 0)
+                {
+                    foreach (var item in history)
+                    {
+                        // можуть бути expired символи. Пропускаю їх.
+                        if (!this.allSymbolsCache.ContainsKey(item.UniqueInstrumentId))
+                            continue;
+
+                        if (item.HasTradeId)
+                            result.Add(this.CreateTradeMessage(item));
+                    }
+                }
+
+                progress?.Report((i + 1) * 100 / types.Length);
             }
+
+            if (result.Count > 0)
+                result.Sort((l, r) => l.DateTime.CompareTo(r.DateTime));
 
             return result;
         }
@@ -437,10 +478,12 @@ namespace OKExV5Vendor.Trading
                     result = TradingOperationResult.CreateError(responce.Message);
                 else if (responce?.IsSuccess ?? false)
                     result = TradingOperationResult.CreateSuccess(responce.OrderId);
-
-                if (result.Status == TradingOperationResultStatus.Failure)
-                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
             }
+            else
+                result = TradingOperationResult.CreateError($"OKEx doesn't allow to modify '{parameters.OrderTypeId}' order.");
+
+            if (result.Status == TradingOperationResultStatus.Failure)
+                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
 
             return result;
         }
@@ -745,7 +788,7 @@ namespace OKExV5Vendor.Trading
             if (fromDateTime > toDateTime)
                 return report;
 
-            var historyOrders = this.client.GetHistoryOrders(okexSymbol, fromDateTime, toDateTime, parameters.CancellationToken, out string error);
+            var historyOrders = this.client.GetHistoryOrders(okexSymbol, fromDateTime, toDateTime, null, parameters.CancellationToken, out string error);
 
             if (!string.IsNullOrEmpty(error))
                 this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
@@ -764,7 +807,7 @@ namespace OKExV5Vendor.Trading
                 row.AddCell(o.TradeMode.GetDescription());
                 row.AddCell(o.AccumulatedFillQty ?? double.NaN, new VolumeFormattingDescription(o.Size ?? double.NaN, o.UniqueInstrumentId));
                 row.AddCell(o.LastFilledPrice ?? double.NaN, new PriceFormattingDescription(o.LastFilledPrice ?? double.NaN, o.UniqueInstrumentId));
-                row.AddCell(o.LastTradeId);
+                row.AddCell(o.UniqueLastTradeId);
                 row.AddCell(o.AverageFilledPrice ?? double.NaN, new PriceFormattingDescription(o.AverageFilledPrice ?? double.NaN, o.UniqueInstrumentId));
                 row.AddCell(o.State.GetDescription());
                 row.AddCell(o.Leverage ?? double.NaN, new PriceFormattingDescription(o.Leverage ?? double.NaN, o.UniqueInstrumentId));
@@ -953,7 +996,7 @@ namespace OKExV5Vendor.Trading
 
                         foreach (var m in openMessages)
                         {
-                            var history = this.CreateHistoryMessage(m, this.algoOrdersCache.ContainsKey(m.OrderId));
+                            var history = this.CreateHistoryMessage(m, null, this.algoOrdersCache.ContainsKey(m.OrderId));
 
                             this.PushMessage(m);
                             this.PushMessage(history);
@@ -962,6 +1005,7 @@ namespace OKExV5Vendor.Trading
                         this.algoOrdersCache[algoOrder.AlgoOrderId] = algoOrder;
                         break;
                     }
+                case OKExAlgoOrderState.Effective:
                 case OKExAlgoOrderState.OrderFailed:
                 case OKExAlgoOrderState.Canceled:
                     {
@@ -969,19 +1013,16 @@ namespace OKExV5Vendor.Trading
 
                         foreach (var m in openMessages)
                         {
-                            var history = this.CreateHistoryMessage(m);
-
                             this.PushMessage(new MessageCloseOrder() { OrderId = m.OrderId });
-                            this.PushMessage(history);
+
+                            if (algoOrder.State != OKExAlgoOrderState.Effective)
+                            {
+                                var history = this.CreateHistoryMessage(m, null);
+                                this.PushMessage(history);
+                            }
                         }
 
                         this.algoOrdersCache.Remove(algoOrder.AlgoOrderId);
-                        break;
-                    }
-
-                // не ясно...
-                case OKExAlgoOrderState.Effective:
-                    {
                         break;
                     }
             }
@@ -997,14 +1038,14 @@ namespace OKExV5Vendor.Trading
                 case OKExOrderState.Live:
                     {
                         openMessage = this.CreateOpenOrderMessage(order);
-                        history = this.CreateHistoryMessage(openMessage, this.ordersCache.ContainsKey(openMessage.OrderId));
+                        history = this.CreateHistoryMessage(openMessage, order, this.ordersCache.ContainsKey(openMessage.OrderId));
                         this.ordersCache[openMessage.OrderId] = order;
                         break;
                     }
                 case OKExOrderState.Canceled:
                     {
                         closeMessage = new MessageCloseOrder() { OrderId = order.OrderId };
-                        history = this.CreateHistoryMessage(this.CreateOpenOrderMessage(order));
+                        history = this.CreateHistoryMessage(this.CreateOpenOrderMessage(order), order);
                         this.ordersCache.Remove(closeMessage.OrderId);
                         break;
                     }
@@ -1013,7 +1054,7 @@ namespace OKExV5Vendor.Trading
                     {
                         this.PushMessage(this.CreateTradeMessage(order));
 
-                        history = this.CreateHistoryMessage(this.CreateOpenOrderMessage(order));
+                        history = this.CreateHistoryMessage(this.CreateOpenOrderMessage(order), order);
 
                         if (order.State == OKExOrderState.Filled)
                         {
@@ -1049,7 +1090,7 @@ namespace OKExV5Vendor.Trading
             {
                 AccountName = "Trading account",
                 AccountId = cryptoAccount.Id,
-                NettingType = NettingType.Undefined,
+                NettingType = cryptoAccount.PositionMode == OKExPositionMode.LongShort ? NettingType.MultiPosition : NettingType.OnePosition,
                 AssetId = DEFAULT_ACCOUNT_BALANCE_ASSET,
                 AccountAdditionalInfo = new List<AdditionalInfoItem>()
                 {
@@ -1133,7 +1174,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Isolated margin equity"),
                     ToolTipKey = loc.key("Isolated margin equity"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.IsolatedEquity.Value,
                     Hidden = false
                 });
@@ -1148,7 +1189,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Adjusted/Effective equity"),
                     ToolTipKey = loc.key("Adjusted/Effective equity"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.AdjustedEquity.Value,
                     Hidden = false
                 });
@@ -1163,7 +1204,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Margin frozen for pending orders"),
                     ToolTipKey = loc.key("Margin frozen for pending orders"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.PendingOrderFrozenMargin.Value,
                     Hidden = false
                 });
@@ -1178,7 +1219,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Initial margin requirement"),
                     ToolTipKey = loc.key("Initial margin requirement"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.InitialMarginRequirement.Value,
                     Hidden = false
                 });
@@ -1193,7 +1234,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Maintenance margin requirement"),
                     ToolTipKey = loc.key("Maintenance margin requirement"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.MaintenanceMarginRequirement.Value,
                     Hidden = false
                 });
@@ -1208,7 +1249,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Margin ratio"),
                     ToolTipKey = loc.key("Margin ratio"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.MarginRatio.Value,
                     Hidden = false
                 });
@@ -1223,7 +1264,7 @@ namespace OKExV5Vendor.Trading
                     NameKey = loc.key("Quantity of positions"),
                     ToolTipKey = loc.key("Quantity of positions"),
                     DataType = ComparingType.Double,
-                    CustomAssetID = "USD",
+                    CustomAssetID = DEFAULT_ACCOUNT_BALANCE_ASSET,
                     Value = balance.PositionsQuantity.Value,
                     Hidden = false
                 });
@@ -1246,7 +1287,8 @@ namespace OKExV5Vendor.Trading
                 Status = order.State.ToTerminal(),
                 OriginalStatus = order.State.GetEnumMember(),
                 FilledQuantity = order.AccumulatedFillQty ?? default,
-                Comment = order.OrderTag ?? string.Empty
+                Comment = order.OrderTag ?? string.Empty,
+                AverageFillPrice = order?.AverageFilledPrice ?? default,
             };
 
             if (order.TakeProfitTriggerPrice.HasValue)
@@ -1393,11 +1435,11 @@ namespace OKExV5Vendor.Trading
 
             return true;
         }
-        private MessageOrderHistory CreateHistoryMessage(MessageOpenOrder message, bool isModified = false)
+        private MessageOrderHistory CreateHistoryMessage(MessageOpenOrder message, OKExOrder order, bool isModified = false)
         {
             return new MessageOrderHistory(message)
             {
-                Status = isModified ? OrderStatus.Modified : message.Status
+                Status = isModified ? OrderStatus.Modified : message.Status,
             };
         }
         private MessageTrade CreateTradeMessage(OKExOrder order)
@@ -1411,8 +1453,9 @@ namespace OKExV5Vendor.Trading
                 Side = order.Side.ToTerminal(),
                 OrderTypeId = order.ToTerminalOrderType(),
                 SymbolId = order.UniqueInstrumentId,
-                TradeId = order.LastTradeId?.ToString(),
-                DateTime = order.UpdateTime,               
+                TradeId = order.UniqueLastTradeId,
+                DateTime = order.UpdateTime,
+                Comment = order.OrderTag
             };
 
             if (order.Fee.HasValue && order.Fee != 0)
@@ -1423,14 +1466,30 @@ namespace OKExV5Vendor.Trading
                     AssetID = order.FeeCurrency
                 };
             }
-
             if (order.PnL.HasValue && order.PnL != 0)
             {
-                trade.NetPnl = new PnLItem()
+                string currency = order.Currency;
+
+                if (string.IsNullOrEmpty(currency) && this.allSymbolsCache.TryGetValue(order.UniqueInstrumentId, out var symbol))
                 {
-                    Value = order.PnL.Value,
-                    AssetID = order.Currency,
-                };
+                    if (symbol.InstrumentType == OKExInstrumentType.Spot || symbol.InstrumentType == OKExInstrumentType.Margin)
+                    {
+                        currency = order.IsTgtEqualToBaseCurrency
+                            ? symbol.BaseCurrency
+                            : symbol.QuoteCurrency;
+                    }
+                    else
+                        currency = order.FeeCurrency;
+                }
+
+                if (!string.IsNullOrEmpty(currency))
+                {
+                    trade.GrossPnl = new PnLItem()
+                    {
+                        Value = order.PnL.Value,
+                        AssetID = currency,
+                    };
+                }
             }
 
             return trade;
@@ -1441,7 +1500,7 @@ namespace OKExV5Vendor.Trading
             {
                 AccountId = this.account.Id,
                 OrderId = transaction.OrderId,
-                TradeId = transaction.TradeId,
+                TradeId = transaction.UniqueTradeId,
                 DateTime = transaction.Time,
                 Price = transaction.FillPrice ?? default,
                 Side = transaction.Side.ToTerminal(),
@@ -1451,44 +1510,13 @@ namespace OKExV5Vendor.Trading
                 {
                     AssetID = transaction.FeeCurrency,
                     Value = transaction.Fee.Value,
-                },              
+                },
             };
 
             return message;
         }
 
-        private void FillGeneralPlaceRequestProperties(OKExPlaceOrderBaseRequest request, PlaceOrderRequestParameters parameters, OKExTradeMode tradeMode, OKExInstrumentType symbolType)
-        {
-            if (tradeMode == OKExTradeMode.Cross)
-                request.MarginCurrency = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.MARGIN_CURRENCY);
-
-            if (tradeMode != OKExTradeMode.Cash)
-            {
-                if (this.account.PositionMode == OKExPositionMode.LongShort && symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
-                {
-                    request.PositionSide = parameters.AdditionalParameters.GetVisibleValue<OKExOrderBehaviourType>(OKExOrderTypeHelper.ORDER_BEHAVIOUR) == OKExOrderBehaviourType.Open
-                        ? request.Side.ToPositionSide()
-                        : request.Side.ToPositionSide().Revers();
-                }
-                else
-                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
-            }
-            else if (symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
-            {
-                if (this.account.PositionMode == OKExPositionMode.LongShort)
-                    request.PositionSide = request.Side.ToPositionSide();
-            }
-        }
-        private string GenerateUniqueClientOrderId()
-        {
-            string clientId = (OKExConsts.BROKER_ID + Guid.NewGuid()).Replace("-", "");
-
-            if (clientId.Length > OKExConsts.MAX_COMMENT_LENGTH)
-                return clientId.Substring(0, OKExConsts.MAX_COMMENT_LENGTH);
-            else
-                return clientId;
-        }
-        private IBalanceCalculator CreateOrderEntryBalanceCalculator() => new OKExOrderEntryBalanceCalculator(this);
+        private IBalanceCalculator CreateOrderEntryBalanceCalculator(Symbol symbol) => new OKExOrderEntryBalanceCalculator(this);
 
         #endregion Factory methods
 
@@ -1532,5 +1560,53 @@ namespace OKExV5Vendor.Trading
 
         #endregion IOKExOrderEntryDataProvider
 
+        #region Misc
+
+        private void FillGeneralPlaceRequestProperties(OKExPlaceOrderBaseRequest request, PlaceOrderRequestParameters parameters, OKExTradeMode tradeMode, OKExInstrumentType symbolType)
+        {
+            if (tradeMode == OKExTradeMode.Cross)
+                request.MarginCurrency = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.MARGIN_CURRENCY);
+
+            if (tradeMode == OKExTradeMode.Cash && symbolType == OKExInstrumentType.Spot)
+                request.QuantityType = OKExOrderQuantityType.BaseCurrency;
+
+            if (tradeMode != OKExTradeMode.Cash)
+            {
+                if (this.account.PositionMode == OKExPositionMode.LongShort && symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
+                {
+                    request.PositionSide = parameters.AdditionalParameters.GetVisibleValue<OKExOrderBehaviourType>(OKExOrderTypeHelper.ORDER_BEHAVIOUR) == OKExOrderBehaviourType.Open
+                        ? request.Side.ToPositionSide()
+                        : request.Side.ToPositionSide().Revers();
+                }
+                else
+                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
+            }
+            else if (symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
+            {
+                if (this.account.PositionMode == OKExPositionMode.LongShort)
+                    request.PositionSide = request.Side.ToPositionSide();
+            }
+        }
+        private string GenerateUniqueClientOrderId()
+        {
+            string clientId = (OKExConsts.BROKER_ID + Guid.NewGuid()).Replace("-", "");
+
+            if (clientId.Length > OKExConsts.MAX_CLIENT_ORDER_ID_LENGTH)
+                return clientId.Substring(0, OKExConsts.MAX_CLIENT_ORDER_ID_LENGTH);
+            else
+                return clientId;
+        }
+        private string FormatComment(string comment)
+        {
+            if (string.IsNullOrEmpty(comment))
+                return null;
+
+            if (comment.Length > OKExConsts.MAX_COMMENT_LENGHT)
+                return comment.Substring(0, OKExConsts.MAX_COMMENT_LENGHT);
+            else
+                return comment;
+        }
+
+        #endregion Misc
     }
 }

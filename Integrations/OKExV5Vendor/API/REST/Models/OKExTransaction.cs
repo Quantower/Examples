@@ -3,10 +3,11 @@ using OKExV5Vendor.API.Misc;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TradingPlatform.BusinessLayer;
 
 namespace OKExV5Vendor.API.REST.Models
 {
-    class OKExTransaction : OKExSymbolBasedObject, IPaginationLoadingItemWithTime
+    class OKExTransaction : OKExSymbolBasedObject, IPaginationLoadingItem
     {
         [JsonProperty("instType")]
         public override OKExInstrumentType InstrumentType { get; set; }
@@ -17,6 +18,16 @@ namespace OKExV5Vendor.API.REST.Models
         [JsonProperty("tradeId")]
         public string TradeId { get; set; }
         public bool HasTradeId => this.TradeId != "0";
+        public string UniqueTradeId
+        {
+            get
+            {
+                if (this.HasTradeId)
+                    return $"{this.TradeId}_{this.InstrumentType.GetEnumMember().ToLowerInvariant()}";
+                else
+                    return this.TradeId;
+            }
+        }
 
         [JsonProperty("ordId")]
         public string OrderId { get; set; }
@@ -56,7 +67,7 @@ namespace OKExV5Vendor.API.REST.Models
 
         #region IPaginationLoadingItemWithTime
 
-        DateTime IPaginationLoadingItemWithTime.Time => this.Time;
+        DateTime IPaginationLoadingItem.Time => this.Time;
         string IPaginationLoadingItem.AfterId => this.BillId;
 
         #endregion IPaginationLoadingItemWithTime

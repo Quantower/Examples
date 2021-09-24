@@ -7,7 +7,7 @@ using System.Text;
 
 namespace OKExV5Vendor.API.REST.Models
 {
-    class OKExDepositRecord : IPaginationLoadingItemWithTime
+    class OKExDepositRecord : IPaginationLoadingItem
     {
         [JsonProperty("txId")]
         public string HashRecord { get; internal set; }
@@ -39,11 +39,11 @@ namespace OKExV5Vendor.API.REST.Models
         internal long? _time;
         public DateTime CreationTime => this._time.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._time.Value).UtcDateTime : default;
 
-        #region IPaginationLoadingItemWithTime
+        #region IPaginationLoadingItem
 
-        DateTime IPaginationLoadingItemWithTime.Time => this.CreationTime;
+        DateTime IPaginationLoadingItem.Time => this.CreationTime;
         string IPaginationLoadingItem.AfterId => this._time.ToString();
 
-        #endregion IPaginationLoadingItemWithTime
+        #endregion IPaginationLoadingItem
     }
 }
