@@ -7,7 +7,10 @@ using TradingPlatform.BusinessLayer.Modules;
 
 namespace RepeatOrderPlacing
 {
-	public class RepeatOrderPlacing : OrderPlacingStrategy
+	/// <summary>
+    /// An example of order placing strategy that repeat placing order few times according to specified parameters: RepeatCount and DelaySeconds
+    /// </summary>
+    public class RepeatOrderPlacing : OrderPlacingStrategy
     {
         [InputParameter]
         public int DelaySeconds = 10;
