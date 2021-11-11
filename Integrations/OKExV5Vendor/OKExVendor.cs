@@ -1,6 +1,5 @@
 using OKExV5Vendor.Market;
 using OKExV5Vendor.Trading;
-using SertificateValidatorShared;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.NetworkInformation;
@@ -16,8 +15,6 @@ namespace OKExV5Vendor
 
         static OKExVendor()
         {
-            
-
 
         }
 
@@ -28,7 +25,14 @@ namespace OKExV5Vendor
             VendorName = OKExConsts.VENDOR_NAME,
             GetDefaultConnections = () => new List<ConnectionInfo>
             {
-                CreateDefaultConnectionInfo(OKExConsts.VENDOR_NAME, OKExConsts.VENDOR_NAME, Path.Combine("OKExV5Vendor", "okex.svg"),null,  true)
+                CreateDefaultConnectionInfo(OKExConsts.VENDOR_NAME, OKExConsts.VENDOR_NAME, Path.Combine("OKExV5Vendor", "okex.svg"),null,  true,links:new List<ConnectionInfoLink>()
+                    {
+                        new ConnectionInfoLink()
+                        {
+                            Text = "Register account",
+                            URL = @"https://www.okex.com/join/8738452"
+                        }
+                    })
             },
             GetConnectionParameters = () =>
             {
@@ -206,8 +210,15 @@ namespace OKExV5Vendor
         #region Trades history
 
         public override TradesHistoryMetadata GetTradesMetadata() => this.currentVendor?.GetTradesMetadata();
-        public override IEnumerable<MessageTrade> GetTrades(System.DateTime from, System.DateTime to, CancellationToken token, System.IProgress<float> progress) => this.currentVendor?.GetTrades(from, to, token, progress);
+
+        public override IList<MessageTrade> GetTrades(TradesHistoryRequestParameters parameters) => this.currentVendor?.GetTrades(parameters);
 
         #endregion Trades history
+
+        #region Order history
+
+        public override IList<MessageOrderHistory> GetOrdersHistory(OrdersHistoryRequestParameters parameters) => this.currentVendor?.GetOrdersHistory(parameters);
+
+        #endregion Order history
     }
 }

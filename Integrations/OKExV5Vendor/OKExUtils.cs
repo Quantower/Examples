@@ -126,7 +126,7 @@ namespace OKExV5Vendor
             return state switch
             {
                 OKExOrderState.Live => OrderStatus.Opened,
-                OKExOrderState.Canceled => OrderStatus.Canceled,
+                OKExOrderState.Canceled => OrderStatus.Cancelled,
                 OKExOrderState.PartiallyFilled => OrderStatus.PartiallyFilled,
                 OKExOrderState.Filled => OrderStatus.Filled,
 
@@ -138,8 +138,8 @@ namespace OKExV5Vendor
             return state switch
             {
                 OKExAlgoOrderState.Live => OrderStatus.Opened,
-                OKExAlgoOrderState.Canceled => OrderStatus.Canceled,
-                OKExAlgoOrderState.Effective => OrderStatus.Working,
+                OKExAlgoOrderState.Canceled => OrderStatus.Cancelled,
+                OKExAlgoOrderState.Effective => OrderStatus.Opened,
                 OKExAlgoOrderState.OrderFailed => OrderStatus.Refused,
 
                 _ => OrderStatus.Unspecified,

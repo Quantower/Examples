@@ -166,10 +166,7 @@ namespace OKExV5Vendor.Market
                 });
             }
 
-            this.publicWebsocket.SendRequest(JsonConvert.SerializeObject(new OKExSubscribeRequest()
-            {
-                Args = channels.ToArray()
-            }));
+            this.publicWebsocket.AddRequestToQueue(channels.ToArray());
         }
 
         private void SubscribeSymbol(OKExSymbol symbol, OKExSubscriptionType type)
@@ -481,7 +478,7 @@ namespace OKExV5Vendor.Market
                 }
             };
 
-            this.publicWebsocket.SendRequest(JsonConvert.SerializeObject(request));
+            this.publicWebsocket.SendRequest(request);
 
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             while (!token.IsCancellationRequested && !cts.IsCancellationRequested && this.symbolCache.AvailableTypesCount != request.Args.Length)

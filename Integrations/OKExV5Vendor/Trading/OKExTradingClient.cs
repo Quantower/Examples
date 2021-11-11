@@ -174,14 +174,22 @@ namespace OKExV5Vendor.Trading
         }
         internal OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, DateTime fromDateTime, DateTime toDateTime, OKExOrderState? state, CancellationToken token, out string error)
         {
+            return this.GetHistoryOrders(okexSymbol, okexSymbol.InstrumentType, state, fromDateTime, toDateTime, token, out error);
+        }
+        internal OKExOrder[] GetHistoryOrders(OKExInstrumentType type, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        {
+            return this.GetHistoryOrders(null, type, null, fromDateTime, toDateTime, token, out error);
+        }
+        private OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, OKExInstrumentType? type, OKExOrderState? state, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        {
             string innerErrorMessage = string.Empty;
 
             var items = this.PaginationLoaderWithRange(
-                (afterId) => this.GetHistoryOrders(okexSymbol, okexSymbol.InstrumentType, state, afterId, token, out innerErrorMessage),
+                (afterId) => this.GetHistoryOrders(okexSymbol, type, state, afterId, token, out innerErrorMessage),
                 fromDateTime,
                 toDateTime);
 
-            if (okexSymbol.InstrumentType == OKExInstrumentType.Spot)
+            if (type == OKExInstrumentType.Spot)
             {
                 var items2 = this.PaginationLoaderWithRange(
                     (afterId) => this.GetHistoryOrders(okexSymbol, OKExInstrumentType.Margin, state, afterId, token, out innerErrorMessage),
@@ -194,24 +202,26 @@ namespace OKExV5Vendor.Trading
             error = innerErrorMessage;
             return items;
         }
-        private OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, OKExInstrumentType type, OKExOrderState? state, string afterId, CancellationToken token, out string error)
+        private OKExOrder[] GetHistoryOrders(OKExSymbol okexSymbol, OKExInstrumentType? type, OKExOrderState? state, string afterId, CancellationToken token, out string error)
         {
+            OKExRateLimitManager.OrdersHistory.WaitMyTurn();
+
             if (type == OKExInstrumentType.Index || type == OKExInstrumentType.Any)
             {
                 error = "Unsupported instrument type";
                 return new OKExOrder[0];
             }
 
-            var parameters = new List<string>
-            {
-                $"instType={type.GetEnumMember()}"
-            };
+            var parameters = new List<string>();
 
             if (okexSymbol != null)
                 parameters.Add($"instId={okexSymbol.OKExInstrumentId}");
 
             if (state.HasValue)
                 parameters.Add($"state={state.GetEnumMember()}");
+
+            if (type.HasValue)
+                parameters.Add($"instType={type.GetEnumMember()}");
 
             if (!string.IsNullOrEmpty(afterId))
                 parameters.Add($"after={afterId}");
@@ -225,24 +235,46 @@ namespace OKExV5Vendor.Trading
             error = responce.Message;
             return responce.Data ?? new OKExOrder[0];
         }
-        internal OKExAlgoOrder[] GetHistoryAlgoOrders(OKExSymbol okexSymbol, OKExAlgoOrderType type, OKExAlgoOrderState state, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
+        internal OKExAlgoOrder[] GetHistoryAlgoOrders(OKExSymbol okexSymbol, OKExInstrumentType? type, OKExAlgoOrderType orderType, OKExAlgoOrderState? state, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
         {
             string innerErrorMessage = string.Empty;
 
             var items = this.PaginationLoaderWithRange(
-                (afterId) => this.GetHistoryAlgoOrders(okexSymbol, type, state, afterId, token, out innerErrorMessage),
+                (afterId) => this.GetHistoryAlgoOrders(okexSymbol, type, orderType, state, afterId, token, out innerErrorMessage),
                 fromDateTime,
                 toDateTime);
 
             error = innerErrorMessage;
             return items;
         }
-        internal OKExAlgoOrder[] GetHistoryAlgoOrders(OKExSymbol okexSymbol, OKExAlgoOrderType type, OKExAlgoOrderState state, string afterId, CancellationToken token, out string error)
+        internal OKExAlgoOrder[] GetHistoryAlgoOrders(OKExAlgoOrderType orderType, OKExAlgoOrderState? state, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
         {
-            var requestPath = $"/api/v5/trade/orders-algo-history?instId={okexSymbol.OKExInstrumentId}&ordType={type.GetEnumMember()}&state={state.GetEnumMember()}";
+            return this.GetHistoryAlgoOrders(null, null, orderType, state, fromDateTime, toDateTime, token, out error);
+        }
+        private OKExAlgoOrder[] GetHistoryAlgoOrders(OKExSymbol okexSymbol, OKExInstrumentType? type, OKExAlgoOrderType orderType, OKExAlgoOrderState? state, string afterId, CancellationToken token, out string error)
+        {
+            OKExRateLimitManager.AlgoOrdersHistory.WaitMyTurn();
+
+            var requestPath = $"/api/v5/trade/orders-algo-history";
+            var parameters = new List<string>()
+            {
+                $"ordType={orderType.GetEnumMember()}"
+            };
+
+            if (okexSymbol != null)
+                parameters.Add($"instId={okexSymbol.OKExInstrumentId}");
+
+            if (state.HasValue)
+                parameters.Add($"state={state.GetEnumMember()}");
+
+            if (type.HasValue)
+                parameters.Add($"instType={type.GetEnumMember()}");
 
             if (!string.IsNullOrEmpty(afterId))
-                requestPath += $"&after={afterId}";
+                parameters.Add($"&after={afterId}");
+
+            if (parameters.Count > 0)
+                requestPath += $"?{string.Join("&", parameters)}";
 
             var responce = this.SendPrivateGetRequest<OKExAlgoOrder[]>(this.settings.RestEndpoint, requestPath, token);
             error = responce.Message;
@@ -312,6 +344,8 @@ namespace OKExV5Vendor.Trading
         }
         internal OKExTransaction[] GetTransactions(OKExInstrumentType type, string afterId, CancellationToken token, out string error)
         {
+            OKExRateLimitManager.TransactionDetails.WaitMyTurn();
+
             var parameters = new List<string>
             {
                 $"instType={type.GetEnumMember()}"
@@ -332,8 +366,6 @@ namespace OKExV5Vendor.Trading
         internal OKExTransaction[] GetTransactions(OKExInstrumentType type, DateTime fromDateTime, DateTime toDateTime, CancellationToken token, out string error)
         {
             string innerErrorMessage = string.Empty;
-
-            OKExRateLimitManager.TransactionDetails.Wait();
 
             var items = this.PaginationLoaderWithRange(
                 (afterId) => this.GetTransactions(type, afterId, token, out innerErrorMessage),
@@ -403,7 +435,7 @@ namespace OKExV5Vendor.Trading
             string sign = OKExSignGenerator.Generate(timestamp, HttpMethod.Get, "/users/self/verify", this.secret);
 
             // send request
-            this.privateWebsocket.SendRequest(JsonConvert.SerializeObject(new OKExLoginRequest()
+            this.privateWebsocket.SendRequest(new OKExLoginRequest()
             {
                 Args = new OKExLoginArguments[]
                 {
@@ -415,7 +447,7 @@ namespace OKExV5Vendor.Trading
                         Sigh = sign
                     }
                 }
-            }));
+            });
 
             // wait 'login' responce
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -428,7 +460,7 @@ namespace OKExV5Vendor.Trading
         private bool SubscribeToTradingChannels(CancellationToken token)
         {
             // send request
-            this.privateWebsocket.SendRequest(JsonConvert.SerializeObject(new OKExSubscribeRequest()
+            this.privateWebsocket.SendRequest(new OKExSubscribeRequest()
             {
                 Args = new OKExChannelRequest[]
                 {
@@ -437,7 +469,7 @@ namespace OKExV5Vendor.Trading
                     new OKExChannelRequest() { ChannelName = OKExChannels.ALGO_ORDERS, InstrumentType = OKExInstrumentType.Any },
                     new OKExChannelRequest() { ChannelName = OKExChannels.POSITIONS,   InstrumentType = OKExInstrumentType.Any },
                 }
-            }));
+            });
 
             // wait 'login' responce
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

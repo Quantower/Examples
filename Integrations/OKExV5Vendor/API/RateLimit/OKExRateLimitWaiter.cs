@@ -12,38 +12,43 @@ namespace OKExV5Vendor.API.RateLimit
         private int currentCount;
         private DateTime lastResetTime;
 
+        private readonly object lockObject = new object();
+
         public OKExRateLimitWaiter(int requestCount, TimeSpan perTime)
         {
             this.requestCount = requestCount;
             this.perTime = perTime;
         }
 
-        public void Wait()
+        public void WaitMyTurn()
         {
-            var now = Core.Instance.TimeUtils.DateTimeUtcNow;
-
-            if (this.currentCount > this.requestCount)
+            lock (this.lockObject)
             {
-                var deltaTime = now - this.lastResetTime;
+                var now = Core.Instance.TimeUtils.DateTimeUtcNow;
 
-                if (deltaTime < this.perTime)
-                    Thread.Sleep(this.perTime - deltaTime);
-
-                this.currentCount = 0;
-                this.lastResetTime = now;
-            }
-            else
-            {
-                var deltaTime = now - this.lastResetTime;
-
-                if (deltaTime > this.perTime)
+                if (this.currentCount > this.requestCount)
                 {
+                    var deltaTime = now - this.lastResetTime;
+
+                    if (deltaTime < this.perTime)
+                        Thread.Sleep(this.perTime - deltaTime);
+
                     this.currentCount = 0;
                     this.lastResetTime = now;
                 }
-            }
+                else
+                {
+                    var deltaTime = now - this.lastResetTime;
 
-            this.currentCount++;
+                    if (deltaTime > this.perTime)
+                    {
+                        this.currentCount = 0;
+                        this.lastResetTime = now;
+                    }
+                }
+
+                this.currentCount++;
+            }
         }
     }
 }

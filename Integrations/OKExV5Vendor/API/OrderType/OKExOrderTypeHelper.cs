@@ -16,7 +16,6 @@ namespace OKExV5Vendor.API.OrderType
         internal const string STOP_LOSS_PRICE = "StopLossPrice";
 
         internal const string ORDER_BEHAVIOUR = "OrderBehaviour";
-        internal const string REDUCE_ONLY = "ReduceOnly";
         internal const string POST_ONLY = "PostOnly";
         internal const string COMMENT = "Comment";
 
@@ -65,7 +64,7 @@ namespace OKExV5Vendor.API.OrderType
         }
         internal static void AddReduceOnly(IList<SettingItem> settings, bool defaultType = false, int index = 0)
         {
-            settings.Add(new SettingItemBoolean(REDUCE_ONLY, defaultType, index)
+            settings.Add(new SettingItemBoolean(TradingPlatform.BusinessLayer.OrderType.REDUCE_ONLY, defaultType, index)
             {
                 Text = loc._("Reduce only"),
                 Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross), new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated))
@@ -80,7 +79,7 @@ namespace OKExV5Vendor.API.OrderType
                 new SelectItem("Close", (int)OKExOrderBehaviourType.Close)
             }, index)
             {
-                Text = loc._("Order behaviour"),              
+                Text = loc._("Order behaviour"),
                 Relation = new SettingItemRelationVisibility(TRADE_MODE_TYPE, new SelectItem(loc._("Cross"), (int)OKExTradeMode.Cross), new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated))
             });
         }
@@ -97,7 +96,7 @@ namespace OKExV5Vendor.API.OrderType
             items.Add(new SelectItem(loc._("Isolated"), (int)OKExTradeMode.Isolated));
 
             var defaultTradeMode = tradeMode ?? (isCryptoSymbol ? OKExTradeMode.Cash : OKExTradeMode.Cross);
-              
+
             settings.Add(new SettingItemSelectorLocalized(TRADE_MODE_TYPE, new SelectItem("", (int)defaultTradeMode), items)
             { Text = loc._("Trade mode"), SortIndex = index });
 

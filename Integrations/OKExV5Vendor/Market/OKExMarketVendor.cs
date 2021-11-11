@@ -475,7 +475,8 @@ namespace OKExV5Vendor.Market
         {
             this.PushMessage(new Last(symbol.UniqueInstrumentId, trade.Price.Value, symbol.ConvertSizeToBaseCurrency(trade), trade.Time)
             {
-                AggressorFlag = trade.Side == OKExSide.Buy ? AggressorFlag.Buy : AggressorFlag.Sell
+                AggressorFlag = trade.Side == OKExSide.Buy ? AggressorFlag.Buy : AggressorFlag.Sell,
+                TradeID = trade.TradeId
             });
         }
         private void Client_OnNewMark(OKExSymbol symbol, OKExMarkItem mark)
@@ -600,9 +601,9 @@ namespace OKExV5Vendor.Market
             {
                 Name = symbol.Name,
                 Description = symbol.ProductAsset + " vs " + symbol.QuottingAsset,
-                VariableTickList = new List<VariableTick>()
+                VariableTickList = new List<VariableTick>
                 {
-                    new VariableTick(double.NegativeInfinity, double.PositiveInfinity, true, symbol.TickSize.Value, 1.0)
+                    new(symbol.TickSize.Value)
                 },
                 ProductAssetId = symbol.ProductAsset,
                 HistoryType = HistoryType.Last,
@@ -656,7 +657,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.MinOrderSize.HasValue && symbol.ContractType == OKExContractType.Undefined)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "min_order_size",
@@ -671,7 +672,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.MaxLeverage.HasValue)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "max_leverage",
@@ -686,7 +687,7 @@ namespace OKExV5Vendor.Market
             {
                 if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Net, out int lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "cross_net_leverage",
@@ -699,7 +700,7 @@ namespace OKExV5Vendor.Market
                 }
                 if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Short, out lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "cross_short_leverage",
@@ -712,7 +713,7 @@ namespace OKExV5Vendor.Market
                 }
                 if (symbol.CrossLeverage.TryGetValue(OKExPositionSide.Long, out lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "cross_long_leverage",
@@ -728,7 +729,7 @@ namespace OKExV5Vendor.Market
             {
                 if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Net, out int lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "Isolated_net_leverage",
@@ -741,7 +742,7 @@ namespace OKExV5Vendor.Market
                 }
                 if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Short, out lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "Isolated_short_leverage",
@@ -754,7 +755,7 @@ namespace OKExV5Vendor.Market
                 }
                 if (symbol.IsolatedLeverage.TryGetValue(OKExPositionSide.Long, out lever))
                 {
-                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                    message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                     {
                         GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                         Id = "isolated_long_leverage",
@@ -769,7 +770,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.ContractType != OKExContractType.Undefined)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "contract_type",
@@ -782,7 +783,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.ContractValue.HasValue)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "contract_value",
@@ -797,7 +798,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.FutureAlias != OKExFutureAliasType.Undefined)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "alias",
@@ -810,7 +811,7 @@ namespace OKExV5Vendor.Market
             }
             if (symbol.Status != OKExInstrumentStatus.Undefined)
             {
-                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem()
+                message.SymbolAdditionalInfo.Add(new AdditionalInfoItem
                 {
                     GroupInfo = OKExConsts.TRADING_INFO_GROUP,
                     Id = "status",

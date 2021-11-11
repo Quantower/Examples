@@ -226,6 +226,11 @@ namespace OKExV5Vendor.Trading
                 OrderTypeId = OKExTriggerMarketOrderType.ID,
                 Value = false
             });
+            rules.Add(new()
+            {
+                Name = Rule.ALLOW_REDUCE_ONLY,
+                Value = true
+            });
             return rules;
         }
         public override IList<MessageAccount> GetAccounts(CancellationToken token)
@@ -301,9 +306,14 @@ namespace OKExV5Vendor.Trading
         {
             AllowLocalStorage = true
         };
-        public override IEnumerable<MessageTrade> GetTrades(DateTime from, DateTime to, CancellationToken token, IProgress<float> progress)
+        public override IList<MessageTrade> GetTrades(TradesHistoryRequestParameters parameters)
         {
             var result = new List<MessageTrade>();
+
+            var from = parameters.From;
+            var to = parameters.To;
+            var token = parameters.CancellationToken;
+            var progress = parameters.Progress;
 
             var types = new OKExInstrumentType[]
             {
@@ -428,12 +438,13 @@ namespace OKExV5Vendor.Trading
                 responce = this.client.PlaceAlgoOrder(request, parameters.CancellationToken, out error);
             }
 
-            if (!string.IsNullOrEmpty(error))
-                result = TradingOperationResult.CreateError(error);
-            else if (!string.IsNullOrEmpty(responce.Message))
-                result = TradingOperationResult.CreateError(responce.Message);
-            else if (responce.IsSuccess)
-                result = TradingOperationResult.CreateSuccess(responce.OrderId);
+            if (responce != null)
+            {
+                if (responce.IsSuccess)
+                    result = TradingOperationResult.CreateSuccess(responce.OrderId);
+                else
+                    result = TradingOperationResult.CreateError($"[{responce.Code}] {error} {responce.Message}");
+            }
 
             if (result.Status == TradingOperationResultStatus.Failure)
                 this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
@@ -472,12 +483,13 @@ namespace OKExV5Vendor.Trading
 
                 var responce = this.client.AmendOrder(request, parameters.CancellationToken, out string error);
 
-                if (!string.IsNullOrEmpty(error))
-                    result = TradingOperationResult.CreateError(error);
-                else if (!string.IsNullOrEmpty(responce?.Message))
-                    result = TradingOperationResult.CreateError(responce.Message);
-                else if (responce?.IsSuccess ?? false)
-                    result = TradingOperationResult.CreateSuccess(responce.OrderId);
+                if (responce != null)
+                {
+                    if (responce.IsSuccess)
+                        result = TradingOperationResult.CreateSuccess(responce.OrderId);
+                    else
+                        result = TradingOperationResult.CreateError($"[{responce.Code}] {error} {responce.Message}");
+                }
             }
             else
                 result = TradingOperationResult.CreateError($"OKEx doesn't allow to modify '{parameters.OrderTypeId}' order.");
@@ -518,12 +530,13 @@ namespace OKExV5Vendor.Trading
                 responce = this.client.CancelAlgoOrder(cancelOrderRequest, parameters.CancellationToken, out error);
             }
 
-            if (!string.IsNullOrEmpty(error))
-                result = TradingOperationResult.CreateError(error);
-            else if (!string.IsNullOrEmpty(responce?.Message))
-                result = TradingOperationResult.CreateError(responce.Message);
-            else if (responce?.IsSuccess ?? false)
-                result = TradingOperationResult.CreateSuccess(responce.OrderId);
+            if (responce != null)
+            {
+                if (responce.IsSuccess)
+                    result = TradingOperationResult.CreateSuccess(responce.OrderId);
+                else
+                    result = TradingOperationResult.CreateError($"[{responce.Code}] {error} {responce.Message}");
+            }
 
             if (result.Status == TradingOperationResultStatus.Failure)
                 this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
@@ -566,6 +579,115 @@ namespace OKExV5Vendor.Trading
         }
 
         #endregion Trading opertions
+
+        #region Order history
+
+        public override IList<MessageOrderHistory> GetOrdersHistory(OrdersHistoryRequestParameters parameters)
+        {
+            var result = new List<MessageOrderHistory>();
+
+            var from = parameters.From;
+            var to = parameters.To;
+            var token = parameters.CancellationToken;
+            var progress = parameters.Progress;
+
+            //
+            // Active orders
+            //
+            var types = new OKExInstrumentType[]
+            {
+                OKExInstrumentType.Spot,
+                OKExInstrumentType.Swap,
+                OKExInstrumentType.Futures,
+                OKExInstrumentType.Option
+            };
+            for (int i = 0; i < types.Length; i++)
+            {
+                var orders = this.client.GetHistoryOrders(types[i], from, to, token, out string error);
+
+                if (!string.IsNullOrEmpty(error))
+                {
+                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                    break;
+                }
+
+                if (token.IsCancellationRequested)
+                    break;
+
+                if (orders?.Length > 0)
+                {
+                    foreach (var item in orders)
+                    {
+                        // можуть бути expired символи. Пропускаю їх.
+                        if (!this.allSymbolsCache.ContainsKey(item.UniqueInstrumentId))
+                            continue;
+
+                        result.Add(new MessageOrderHistory(this.CreateOpenOrderMessage(item)));
+                    }
+                }
+
+                progress?.Report((i + 1) * 50 / types.Length);
+            }
+
+            //
+            // Algo orders
+            //
+            var algoOrderTypes = new OKExAlgoOrderType[]
+            {
+                OKExAlgoOrderType.Conditional,
+                OKExAlgoOrderType.OCO,
+                OKExAlgoOrderType.Trigger
+            };
+            var algoStates = new OKExAlgoOrderState[]
+            {
+                OKExAlgoOrderState.Canceled,
+                OKExAlgoOrderState.Live,
+                OKExAlgoOrderState.OrderFailed,
+                OKExAlgoOrderState.Effective
+            };
+
+            for (int i = 0; i < algoOrderTypes.Length; i++)
+            {
+                for (int y = 0; y < algoStates.Length; y++)
+                {
+                    var algoOrders = this.client.GetHistoryAlgoOrders(algoOrderTypes[i], algoStates[y], from, to, token, out string error);
+
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                        break;
+                    }
+
+                    if (token.IsCancellationRequested)
+                        break;
+
+                    if (algoOrders?.Length > 0)
+                    {
+                        foreach (var item in algoOrders)
+                        {
+                            // можуть бути expired символи. Пропускаю їх.
+                            if (!this.allSymbolsCache.ContainsKey(item.UniqueInstrumentId))
+                                continue;
+
+                            if (this.CreateOpenOrderMessages(item) is IEnumerable<MessageOpenOrder> orders)
+                            {
+                                foreach (var o in orders)
+                                    result.Add(new MessageOrderHistory(o));
+                            }
+                        }
+                    }
+                }
+
+                progress?.Report((i + 1) * 50 / types.Length + 50);
+            }
+
+            if (result.Count > 0)
+                result.Sort((l, r) => l.LastUpdateTime.CompareTo(r.LastUpdateTime));
+
+            return result;
+        }
+
+        #endregion Order history
 
         #region Reports
 
@@ -706,7 +828,7 @@ namespace OKExV5Vendor.Trading
             if (fromDateTime > toDateTime)
                 return report;
 
-            var historyOrders = this.client.GetHistoryAlgoOrders(okexSymbol, algoOrderType, algoOrderState, fromDateTime, toDateTime, parameters.CancellationToken, out string error);
+            var historyOrders = this.client.GetHistoryAlgoOrders(okexSymbol, okexSymbol.InstrumentType, algoOrderType, algoOrderState, fromDateTime, toDateTime, parameters.CancellationToken, out string error);
 
             if (!string.IsNullOrEmpty(error))
                 this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
@@ -1439,7 +1561,7 @@ namespace OKExV5Vendor.Trading
         {
             return new MessageOrderHistory(message)
             {
-                Status = isModified ? OrderStatus.Modified : message.Status,
+                Status = isModified ? OrderStatus.Opened : message.Status,
             };
         }
         private MessageTrade CreateTradeMessage(OKExOrder order)
@@ -1457,7 +1579,7 @@ namespace OKExV5Vendor.Trading
                 DateTime = order.UpdateTime,
                 Comment = order.OrderTag
             };
-
+            
             if (order.Fee.HasValue && order.Fee != 0)
             {
                 trade.Fee = new PnLItem()
@@ -1516,7 +1638,7 @@ namespace OKExV5Vendor.Trading
             return message;
         }
 
-        private IBalanceCalculator CreateOrderEntryBalanceCalculator(Symbol symbol) => new OKExOrderEntryBalanceCalculator(this);
+        private IBalanceCalculator CreateOrderEntryBalanceCalculator(Symbol symbol, Account account) => new OKExOrderEntryBalanceCalculator(this);
 
         #endregion Factory methods
 
@@ -1579,7 +1701,7 @@ namespace OKExV5Vendor.Trading
                         : request.Side.ToPositionSide().Revers();
                 }
                 else
-                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.REDUCE_ONLY);
+                    request.ReduceOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OrderType.REDUCE_ONLY);
             }
             else if (symbolType != OKExInstrumentType.Spot && symbolType != OKExInstrumentType.Margin)
             {

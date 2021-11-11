@@ -18,18 +18,22 @@ namespace OKExV5Vendor.API.Websocket
 {
     class OKExWebSocket
     {
-        private const int MAX_SUB_UNSUB_CHANNELS_PER_REQUEST = 60;
+        private const int MAX_SUB_UNSUB_CHANNELS_PER_REQUEST = 65;
+        private const string PING_MESSAGE = "ping";
+        private const string PONG_MESSAGE = "pong";
 
         protected readonly WebSocket webSocket;
         protected readonly ActionBufferedProcessor inputProcessor;
 
         private readonly bool useQueueRequest;
+
         private readonly object subscriptionLockKey;
         private readonly Timer innerTimer;
         private readonly Timer pingPongTimer;
         private readonly IDictionary<string, IDictionary<string, OKExChannelRequest>> pendingSubscribeChannels;
         private readonly IDictionary<string, IDictionary<string, OKExChannelRequest>> pendingUnsubsribeChannels;
         private readonly Stopwatch sw;
+        private readonly JsonSerializerSettings jsonSettings;
 
         public event Action<JObject> OnResponceReceive;
 
@@ -42,14 +46,14 @@ namespace OKExV5Vendor.API.Websocket
             {
                 EnableAutoSendPing = false
             };
-            
-            this.useQueueRequest = useQueueRequest;
-
             this.webSocket.Opened += this.WebSocket_Opened;
             this.webSocket.MessageReceived += this.WebSocket_MessageReceived;
             this.webSocket.Error += this.WebSocket_Error;
             this.webSocket.Closed += this.WebSocket_Closed;
+            
+            this.useQueueRequest = useQueueRequest;
 
+            this.jsonSettings = new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore };
             this.innerTimer = new Timer(this.SubscriptionTimerHandler, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             this.pingPongTimer = new Timer(this.PingPongTimerHandler, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             this.sw = new Stopwatch();
@@ -117,7 +121,7 @@ namespace OKExV5Vendor.API.Websocket
         {
             try
             {
-                if (this.sw.IsRunning && e.Message == "pong")
+                if (this.sw.IsRunning && e.Message == PONG_MESSAGE)
                     this.sw.Stop();
                 else
                     this.OnResponceReceive?.Invoke(JObject.Parse(e.Message));
@@ -132,7 +136,7 @@ namespace OKExV5Vendor.API.Websocket
             //Core.Instance.Loggers.Log("OKEx: websocket was opened");
         }
 
-        internal void SendRequest(string request) => this.webSocket.Send(request);
+        internal void SendRequest(object request) => this.webSocket.Send(JsonConvert.SerializeObject(request, this.jsonSettings));
 
         internal void AddRequestToQueue(params OKExChannelRequest[] items)
         {
@@ -198,7 +202,7 @@ namespace OKExV5Vendor.API.Websocket
                     }
 
                     if (requestChannels.Count > 0)
-                        this.webSocket.Send(JsonConvert.SerializeObject(new OKExUnsubscribeRequest() { Args = requestChannels.ToArray() }));
+                        this.SendRequest(new OKExUnsubscribeRequest() { Args = requestChannels.ToArray() });
                 }
 
                 if (this.pendingSubscribeChannels.Count > 0)
@@ -217,14 +221,14 @@ namespace OKExV5Vendor.API.Websocket
                     }
 
                     if (requestChannels.Count > 0)
-                        this.webSocket.Send(JsonConvert.SerializeObject(new OKExSubscribeRequest() { Args = requestChannels.ToArray() }));
+                        this.SendRequest(new OKExSubscribeRequest() { Args = requestChannels.ToArray() });
                 }
             }
         }
         private void PingPongTimerHandler(object state)
         {
             this.sw.Restart();
-            this.webSocket.Send("ping");
+            this.webSocket.Send(PING_MESSAGE);
         }
     }
 }
