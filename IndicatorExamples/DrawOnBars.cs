@@ -36,8 +36,7 @@ namespace DrawOnBars
             if (this.CurrentChart == null)
                 return;
 
-            // Use args.Hdc to create Graphics which give us acces to chart canvas
-            Graphics graphics = Graphics.FromHdc(args.Hdc);
+            Graphics graphics = args.Graphics;
 
             // Use StringFormat class to center text
             StringFormat stringFormat = new StringFormat()
