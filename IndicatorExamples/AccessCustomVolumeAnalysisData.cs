@@ -11,7 +11,7 @@ namespace AccessCustomVolumeAnalysisData
     /// </summary>
 	public class AccessCustomVolumeAnalysisData : Indicator
     {
-        private HistoricalData dayHistory;
+        private HistoricalData hoursHistory;
         private const int HOURS_COUNT = 5;
         private IVolumeAnalysisCalculationProgress loadingVolumeAnalysisProgress;
 
@@ -32,10 +32,10 @@ namespace AccessCustomVolumeAnalysisData
         protected override void OnInit()
         {
             // Request required history timeframe (independent from chart where indicator is running)
-            this.dayHistory = this.Symbol.GetHistory(Period.HOUR1, this.Symbol.HistoryType, DateTime.UtcNow.AddHours(-HOURS_COUNT * 2));
+            this.hoursHistory = this.Symbol.GetHistory(Period.HOUR1, this.Symbol.HistoryType, DateTime.UtcNow.AddHours(-HOURS_COUNT * 2));
          
             // Request volume analysis data
-            this.loadingVolumeAnalysisProgress = Core.Instance.VolumeAnalysis.CalculateProfile(this.dayHistory);  
+            this.loadingVolumeAnalysisProgress = Core.Instance.VolumeAnalysis.CalculateProfile(this.hoursHistory);  
         }
 
         public override void OnPaintChart(PaintChartEventArgs args)
@@ -45,7 +45,7 @@ namespace AccessCustomVolumeAnalysisData
             Font font = new Font("Arial", 8, FontStyle.Regular);
 
             // Check if everything is ready to draw volume analysis data
-            if (this.dayHistory == null || this.loadingVolumeAnalysisProgress == null || this.loadingVolumeAnalysisProgress.State != VolumeAnalysisCalculationState.Finished || this.dayHistory.Count < HOURS_COUNT)
+            if (this.hoursHistory == null || this.loadingVolumeAnalysisProgress == null || this.loadingVolumeAnalysisProgress.State != VolumeAnalysisCalculationState.Finished || this.hoursHistory.Count < HOURS_COUNT)
             {
                 args.Graphics.DrawString($"Volume analysis data is loading {this.loadingVolumeAnalysisProgress.ProgressPercent}%...", font, Brushes.LightBlue, 30, 50);
                 return;
@@ -54,7 +54,7 @@ namespace AccessCustomVolumeAnalysisData
             // Draw volume analysis data
             args.Graphics.DrawString($"Last {HOURS_COUNT} hours volume:", font, Brushes.LightBlue, 30, 50);
             for (int i = 0; i < HOURS_COUNT; i++)
-                args.Graphics.DrawString($"{this.dayHistory[i].TimeLeft.ToShortTimeString()} = {this.Symbol.FormatQuantity(this.dayHistory[i].VolumeAnalysisData.Total.Volume)}", font, Brushes.LightBlue, 30, 70 + 20 * i);
+                args.Graphics.DrawString($"{this.hoursHistory[i].TimeLeft.ToShortTimeString()} = {this.Symbol.FormatQuantity(this.hoursHistory[i].VolumeAnalysisData.Total.Volume)}", font, Brushes.LightBlue, 30, 70 + 20 * i);
         }
 
         public override void Dispose()
@@ -63,7 +63,7 @@ namespace AccessCustomVolumeAnalysisData
 
             if (this.loadingVolumeAnalysisProgress != null && this.loadingVolumeAnalysisProgress.State != VolumeAnalysisCalculationState.Finished)
                 this.loadingVolumeAnalysisProgress.AbortLoading();
-            this.dayHistory?.Dispose();
+            this.hoursHistory?.Dispose();
         } 
     }
 }
