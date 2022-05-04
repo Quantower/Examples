@@ -1,0 +1,45 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Login V10</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<script>
+		function JSFunction(text) {
+			document.getElementById('usernametextbox').value = text;
+            document.getElementById('passwordtextbox').value = text;
+        }
+    </script>
+</head>
+<body>
+	
+	<div class="limiter">
+		<div class="container-login100">
+			<div class="wrap-login100 p-t-50 p-b-90">
+				<div>					
+					<div>
+						<input id ="usernametextbox" type="text" name="username" placeholder="Username">						
+					</div>
+										
+					<div>
+						<input id="passwordtextbox" type="password" name="pass" placeholder="Password">						
+					</div>
+										
+					<div>
+						<button id="loginbutton" class="login100-form-btn">
+							Login
+						</button>
+						<button id="clearbutton" class="login100-form-btn">
+							Clear
+						</button>
+						<button id="callJSFunctionbutton" class="login100-form-btn">
+							Call JS function
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>
