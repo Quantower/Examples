@@ -1,11 +1,13 @@
+// Copyright QUANTOWER LLC. � 2017-2022. All rights reserved.
+
 using OKExV5Vendor.API;
-using OKExV5Vendor.API.OrderType;
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket;
 using OKExV5Vendor.API.Websocket.Models;
 using System;
 using System.Globalization;
 using System.Linq;
+using OKExV5Vendor.API.OrderTypes;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 
@@ -71,7 +73,7 @@ namespace OKExV5Vendor
             { Period.MONTH1, OKExCandlePeriod.Month1 },
             { new Period(BasePeriod.Month, 3), OKExCandlePeriod.Month3 },
             { new Period(BasePeriod.Month, 6), OKExCandlePeriod.Month6 },
-            { Period.YEAR1, OKExCandlePeriod.Year1 }
+            //{ Period.YEAR1, OKExCandlePeriod.Year1 }
         };
 
         public static SymbolType ToTerminal(this OKExInstrumentType type)
@@ -258,7 +260,7 @@ namespace OKExV5Vendor
         {
             if (parameters.OrderTypeId == OrderType.Limit)
             {
-                bool postOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OKExOrderTypeHelper.POST_ONLY);
+                bool postOnly = parameters.AdditionalParameters.GetVisibleValue<bool>(OrderType.POST_ONLY);
 
                 if (postOnly)
                     return OKExOrderType.PostOnly;
@@ -365,37 +367,6 @@ namespace OKExV5Vendor
             }
 
             return false;
-        }
-        public static bool TryGetChannelName(this OKExSymbol symbol, OKExSubscriptionType subscriptionType, out string channelName)
-        {
-            channelName = null;
-
-            switch (subscriptionType)
-            {
-                case OKExSubscriptionType.Last:
-                    channelName = OKExChannels.TRADES;
-                    break;
-                case OKExSubscriptionType.Mark:
-                    channelName = OKExChannels.MARK_PRICE;
-                    break;
-                case OKExSubscriptionType.Level2:
-                    channelName = OKExChannels.ORDER_BOOK_400;
-                    break;
-                case OKExSubscriptionType.Ticker:
-                    {
-                        if (symbol.InstrumentType == OKExInstrumentType.Index)
-                            channelName = OKExChannels.INDEX_TICKERS;
-                        else
-                            channelName = OKExChannels.TICKERS;
-                        break;
-                    }
-                case OKExSubscriptionType.OpenInterest:
-                    channelName = OKExChannels.OPEN_INTEREST;
-                    break;
-            }
-
-            return channelName != null;
-
         }
         public static Period[] GetAvailablePeriods() => periodMapper.Select(s => s.Key).ToArray();
 

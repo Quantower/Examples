@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket.Models;
 using System.Collections.Generic;

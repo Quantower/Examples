@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
 
 using SertificateValidatorShared;
 using System.Collections.Generic;

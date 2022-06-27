@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <OutputPath>$(SolutionDir)bin/bin/Vendors/$(AssemblyName)</OutputPath>
+    <OutputPath>$(SolutionDir)out/TradingPlatform/v1.0.0/bin/Vendors/$(AssemblyName)</OutputPath>
     <Platforms>AnyCPU;x64</Platforms>
     <Configurations>Debug;Release;UnitTests;Screener</Configurations>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -31,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="WebSocket4Net" Version="0.15.2" />
   </ItemGroup>
 
@@ -41,6 +42,6 @@
     </ProjectReference>
   </ItemGroup>
 
-
+  <Import Project="..\..\BusinessLayer\SertificateValidatorShared\SertificateValidatorShared.projitems" Label="Shared" />
 
 </Project>

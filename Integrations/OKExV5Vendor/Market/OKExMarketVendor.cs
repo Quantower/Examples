@@ -1,5 +1,6 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using OKExV5Vendor.API;
-using OKExV5Vendor.API.OrderType;
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket.Models;
 using System;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using OKExV5Vendor.API.OrderTypes;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 
@@ -61,7 +63,7 @@ namespace OKExV5Vendor.Market
         }
         public override void OnConnected(CancellationToken token)
         {
-            this.client.SubscribeFundingRates();
+            this.client.SubscribeFundingRate();
             base.OnConnected(token);
         }
         public override PingResult Ping()
@@ -416,7 +418,9 @@ namespace OKExV5Vendor.Market
                     }
                 case SubscribeQuoteType.Mark:
                     {
-                        this.client.SubscribeMark(okexSymbol);
+                        if (okexSymbol.InstrumentType != OKExInstrumentType.Spot)
+                            this.client.SubscribeMark(okexSymbol);
+
                         break;
                     }
             }
@@ -448,7 +452,8 @@ namespace OKExV5Vendor.Market
                     }
                 case SubscribeQuoteType.Mark:
                     {
-                        this.client.UnsubscribeMark(okexSymbol);
+                        if (okexSymbol.InstrumentType != OKExInstrumentType.Spot)
+                            this.client.UnsubscribeMark(okexSymbol);
                         break;
                     }
             }
@@ -476,7 +481,7 @@ namespace OKExV5Vendor.Market
             this.PushMessage(new Last(symbol.UniqueInstrumentId, trade.Price.Value, symbol.ConvertSizeToBaseCurrency(trade), trade.Time)
             {
                 AggressorFlag = trade.Side == OKExSide.Buy ? AggressorFlag.Buy : AggressorFlag.Sell,
-                TradeID = trade.TradeId
+                TradeId = trade.TradeId
             });
         }
         private void Client_OnNewMark(OKExSymbol symbol, OKExMarkItem mark)
@@ -605,10 +610,8 @@ namespace OKExV5Vendor.Market
                 {
                     new(symbol.TickSize.Value)
                 },
-                ProductAssetId = symbol.ProductAsset,
                 HistoryType = HistoryType.Last,
                 LotSize = 1d,
-                QuotingCurrencyAssetID = symbol.QuottingAsset,
                 ExchangeId = OKExConsts.DEFAULT_EXCHANGE_ID,
                 ExpirationDate = symbol.ExpiryTimeUtc,
                 SymbolType = symbol.InstrumentType.ToTerminal(),
@@ -619,18 +622,26 @@ namespace OKExV5Vendor.Market
                 SymbolAdditionalInfo = new List<AdditionalInfoItem>()
             };
 
+            // derivative
             if (symbol.ContractType != OKExContractType.Undefined)
             {
-                message.MinLot = symbol.MinOrderSize ?? 1;
-                message.LotStep = symbol.ContractMultiplier ?? 1;
+                message.MinLot = 1;
+                message.LotStep = 1;
+                message.NotionalValueStep = symbol.ContractValue.Value;
+                message.LotSize = symbol.ContractValue.Value;
+                message.ProductAssetId = symbol.ContractValueCurrency;
+                message.QuotingCurrencyAssetID = symbol.SettlementCurrency;
             }
+            // spot
             else
             {
                 message.MinLot = Math.Min(symbol.MinOrderSize ?? 1, 1);
                 message.LotStep = symbol.LotSize ?? 1;
+                message.ProductAssetId = symbol.ProductAsset;
+                message.QuotingCurrencyAssetID = symbol.QuottingAsset;
+                message.NotionalValueStep = message.LotStep;
             }
 
-            message.NotionalValueStep = message.LotStep;
 
             if (message.SymbolType == SymbolType.Indexes)
             {

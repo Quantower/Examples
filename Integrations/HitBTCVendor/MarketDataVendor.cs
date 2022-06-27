@@ -1,4 +1,4 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
 
 using HitBTC.Net;
 using HitBTC.Net.Communication;
@@ -34,8 +34,7 @@ namespace HitBTCVendor
         protected Dictionary<string, HitCurrency> currenciesCache;
         protected Dictionary<string, HitSymbol> symbolsCache;
 
-        private Ping ping;
-        private Uri pingUri;
+        private readonly PingMeter pingMeter;
 
         private Dictionary<string, long> lastsTimeCache;
 
@@ -52,8 +51,7 @@ namespace HitBTCVendor
             this.currenciesCache = new Dictionary<string, HitCurrency>();
             this.symbolsCache = new Dictionary<string, HitSymbol>();
 
-            this.ping = new Ping();
-            this.pingUri = new Uri("https://api.hitbtc.com/api/2");
+            this.pingMeter = new PingMeter(HitBTCVendor.VENDOR_NAME, "https://api.hitbtc.com/api/2");
 
             this.lastsTimeCache = new Dictionary<string, long>();
 
@@ -74,9 +72,6 @@ namespace HitBTCVendor
 
             this.currenciesCache = new Dictionary<string, HitCurrency>();
             this.symbolsCache = new Dictionary<string, HitSymbol>();
-
-            this.ping = new Ping();
-            this.pingUri = new Uri("https://api.hitbtc.com/api/2");
 
             this.lastsTimeCache = new Dictionary<string, long>();
 
@@ -133,15 +128,8 @@ namespace HitBTCVendor
 
             try
             {
-                var pingResult = this.ping.Send(this.pingUri.Host);
-
-                if (pingResult != null && pingResult.Status == IPStatus.Success)
-                {
-                    result.PingTime = TimeSpan.FromMilliseconds(pingResult.RoundtripTime);
-                    result.State = PingEnum.Connected;
-                }
-                else
-                    Core.Instance.Loggers.Log($"{HitBTCVendor.VENDOR_NAME}. Error while pinging host: {this.pingUri.Host}");
+                result.PingTime = this.pingMeter.MeasurePing();
+                result.State = result.PingTime != null ? PingEnum.Connected : PingEnum.Disconnected;
             }
             catch (Exception ex)
             {
@@ -153,7 +141,7 @@ namespace HitBTCVendor
 
         #endregion Connection
 
-        #region Symbols and symbol groups         
+        #region Symbols and symbol groups
         public override IList<MessageSymbol> GetSymbols(CancellationToken token)
         {
             List<MessageSymbol> result = new List<MessageSymbol>();
@@ -387,7 +375,7 @@ namespace HitBTCVendor
                 DeltaCalculationType = DeltaCalculationType.TickDirection,
                 VariableTickList = new List<VariableTick>
                 {
-                    new VariableTick(double.NegativeInfinity, double.PositiveInfinity, true, (double)hitSymbol.TickSize, 1.0)
+                    new((double)hitSymbol.TickSize)
                 },
                 LotSize = 1d,
                 LotStep = (double)hitSymbol.QuantityIncrement,
@@ -399,7 +387,7 @@ namespace HitBTCVendor
                 AllowCalculateRealtimeVolume = false,
                 AllowCalculateRealtimeTicks = false,
                 AllowCalculateRealtimeTrades = false,
-                
+
                 AllowAbbreviatePriceByTickSize = true,
 
                 SymbolAdditionalInfo = new List<AdditionalInfoItem>
@@ -529,7 +517,10 @@ namespace HitBTCVendor
                 else
                     lastTimeTicks = dateTime.Ticks;
 
-                yield return new Last(symbol, price, size, dateTime);
+                yield return new Last(symbol, price, size, dateTime)
+                {
+                    TradeId = item.Id.ToString()
+                };
             }
 
             this.lastsTimeCache[symbol] = lastTimeTicks;

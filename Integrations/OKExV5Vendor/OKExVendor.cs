@@ -1,5 +1,8 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using OKExV5Vendor.Market;
 using OKExV5Vendor.Trading;
+using SertificateValidatorShared;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.NetworkInformation;
@@ -15,7 +18,8 @@ namespace OKExV5Vendor
 
         static OKExVendor()
         {
-
+            SertificateValidator.CheckAssemblyCertificate(typeof(Core).Assembly.Location);
+            SertificateValidator.CheckAssemblyCertificate(typeof(OKExVendor).Assembly.Location);
         }
 
         #region Integration details

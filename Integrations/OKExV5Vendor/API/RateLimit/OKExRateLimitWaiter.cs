@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using System;
 using System.Threading;
 using TradingPlatform.BusinessLayer;

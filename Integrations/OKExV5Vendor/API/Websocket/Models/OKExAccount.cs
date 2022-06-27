@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using Newtonsoft.Json;
 using OKExV5Vendor.API.REST.JsonConverters;
 using System.Reflection;

@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OKExV5Vendor.API;
@@ -32,6 +34,8 @@ namespace OKExV5Vendor.Trading
         private readonly JsonSerializer jsonSerializer;
         private readonly OKExWebSocket privateWebsocket;
 
+        private readonly IDictionary<OKExInstrumentType, OKExFeeRate> feeRatesCache;
+
         private readonly HashSet<string> subscribedTradingChannels;
         private readonly object sendPrivateRequestLockKey = new();
 
@@ -54,6 +58,7 @@ namespace OKExV5Vendor.Trading
             this.apiKey = apiKey;
             this.passPhrase = passPhrase;
             this.subscribedTradingChannels = new HashSet<string>();
+            this.feeRatesCache = new Dictionary<OKExInstrumentType, OKExFeeRate>();
 
             this.LastErrorMessage = string.Empty;
             this.jsonSerializer = new JsonSerializer();
@@ -77,6 +82,20 @@ namespace OKExV5Vendor.Trading
 
             if (string.IsNullOrEmpty(error) && !string.IsNullOrEmpty(this.LastErrorMessage))
                 error = this.LastErrorMessage;
+
+            //
+            if (isConnected)
+            {
+                var instTypes = new OKExInstrumentType[] { OKExInstrumentType.Spot, OKExInstrumentType.Margin, OKExInstrumentType.Futures, OKExInstrumentType.Option, OKExInstrumentType.Swap };
+
+                foreach (var item in instTypes)
+                {
+                    var feeRate = this.GetFeeRate(item, token, out error);
+
+                    if (feeRate != null)
+                        this.feeRatesCache[item] = feeRate;
+                }
+            }
 
             return isConnected;
         }
@@ -169,6 +188,12 @@ namespace OKExV5Vendor.Trading
         internal OKExAccount GetAccount(CancellationToken token, out string error)
         {
             var responce = this.SendPrivateGetRequest<OKExAccount[]>(this.settings.RestEndpoint, "/api/v5/account/config", token);
+            error = responce.Message;
+            return responce.Data?.FirstOrDefault();
+        }
+        internal OKExFeeRate GetFeeRate(OKExInstrumentType type, CancellationToken token, out string error)
+        {
+            var responce = this.SendPrivateGetRequest<OKExFeeRate[]>(this.settings.RestEndpoint, $"/api/v5/account/trade-fee?instType={type.GetEnumMember()}", token);
             error = responce.Message;
             return responce.Data?.FirstOrDefault();
         }
@@ -666,6 +691,22 @@ namespace OKExV5Vendor.Trading
             }
 
             return itemsCache.ToArray();
+        }
+
+        protected override bool TryGetChannelName(OKExSymbol symbol, OKExSubscriptionType subscriptionType, out string channelName)
+        {
+            switch (subscriptionType)
+            {
+                case OKExSubscriptionType.Level2 when this.feeRatesCache.TryGetValue(symbol.InstrumentType, out var feeRate) && feeRate.IsVIP5orGreater:
+                    {
+                        channelName = OKExChannels.ORDER_BOOK_400_TBT;
+                        break;
+                    }
+                default:
+                    return base.TryGetChannelName(symbol, subscriptionType, out channelName);
+            }
+
+            return channelName != null;
         }
 
         #endregion Misc

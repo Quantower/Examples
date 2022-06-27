@@ -1,4 +1,4 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2021. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
 
 using HitBTC.Net;
 using HitBTC.Net.Communication;
@@ -163,17 +163,22 @@ namespace HitBTCVendor
             {
                 Name = Rule.ALLOW_MODIFY_TIF,
                 Value = false
-            }
+            },
+            new MessageRule
+            {
+                Name = Rule.PLACE_ORDER_TRADING_OPERATION_HAS_ORDER_ID,
+                Value = true
+            },
         };
         #endregion Accounts and rules
 
         #region Orders
         public override IList<OrderType> GetAllowedOrderTypes(CancellationToken token) => new List<OrderType>
         {
-            new MarketOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
-            new LimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
-            new StopOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD),
-            new StopLimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD)
+            new MarketOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD){BalanceCalculatorFactory = (_, _) => new MultiAssetBalanceCalculator()},
+            new LimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD){BalanceCalculatorFactory = (_, _) => new MultiAssetBalanceCalculator()},
+            new StopOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD){BalanceCalculatorFactory = (_, _) => new MultiAssetBalanceCalculator()},
+            new StopLimitOrderType(TimeInForce.Day, TimeInForce.GTC, TimeInForce.FOK, TimeInForce.IOC, TimeInForce.GTD){BalanceCalculatorFactory = (_, _) => new MultiAssetBalanceCalculator()}
         };
 
         public override IList<MessageOpenOrder> GetPendingOrders(CancellationToken token)
@@ -326,7 +331,7 @@ namespace HitBTCVendor
                 default:
                     return base.GenerateReport(reportRequestParameters);
             }
-            
+
         }
 
         private Report GenerateOrdersHistoryReport(ReportRequestParameters reportRequestParameters)
@@ -386,8 +391,8 @@ namespace HitBTCVendor
 
                 var row = new ReportRow();
 
-                row.AddCell(order.UpdatedAt, new DateTimeFormatterDescription(order.UpdatedAt));
-                row.AddCell(order.CreatedAt, new DateTimeFormatterDescription(order.CreatedAt));
+                row.AddCell(order.UpdatedAt, new DateTimeFormattingDescription(order.UpdatedAt));
+                row.AddCell(order.CreatedAt, new DateTimeFormattingDescription(order.CreatedAt));
                 row.AddCell(order.Symbol);
                 row.AddCell(order.Id);
                 row.AddCell(order.ClientOrderId);
@@ -399,7 +404,7 @@ namespace HitBTCVendor
                 row.AddCell(order.CumulativeQuantity, new VolumeFormattingDescription((double)order.CumulativeQuantity, order.Symbol));
                 row.AddCell(this.ConvertTimeInForce(order.TimeInForce).ToString());
                 row.AddCell(this.ConvertOrderStatus(order.Status).ToString());
-                
+
                 report.Rows.Add(row);
             }
 
@@ -459,7 +464,7 @@ namespace HitBTCVendor
 
                 var row = new ReportRow();
 
-                row.AddCell(trade.Timestamp, new DateTimeFormatterDescription(trade.Timestamp));
+                row.AddCell(trade.Timestamp, new DateTimeFormattingDescription(trade.Timestamp));
                 row.AddCell(trade.Symbol);
                 row.AddCell(trade.Id);
                 row.AddCell(trade.OrderId);
@@ -532,8 +537,8 @@ namespace HitBTCVendor
 
                 var row = new ReportRow();
 
-                row.AddCell(transaction.UpdatedAt, new DateTimeFormatterDescription(transaction.UpdatedAt));
-                row.AddCell(transaction.CreatedAt, new DateTimeFormatterDescription(transaction.CreatedAt));
+                row.AddCell(transaction.UpdatedAt, new DateTimeFormattingDescription(transaction.UpdatedAt));
+                row.AddCell(transaction.CreatedAt, new DateTimeFormattingDescription(transaction.CreatedAt));
                 row.AddCell(transaction.Id);
                 row.AddCell(type);
                 row.AddCell(transaction.Currency);
@@ -543,7 +548,7 @@ namespace HitBTCVendor
                 row.AddCell(transaction.Address);
                 row.AddCell(transaction.Index);
                 row.AddCell(transaction.Status.ToString());
-                
+
                 report.Rows.Add(row);
             }
 
@@ -605,7 +610,7 @@ namespace HitBTCVendor
             var message = this.CreateOpenOrder(hitReport as HitOrder);
 
             if (hitReport.ReportType == HitReportType.Replaced)
-                message.Status = OrderStatus.Modified;
+                message.Status = OrderStatus.Opened;
 
             return message;
         }
@@ -668,7 +673,7 @@ namespace HitBTCVendor
                     return OrderStatus.Opened;
                 case HitOrderStatus.Canceled:
                 case HitOrderStatus.Expired:
-                    return OrderStatus.Canceled;
+                    return OrderStatus.Cancelled;
                 case HitOrderStatus.PartiallyFilled:
                     return OrderStatus.PartiallyFilled;
                 case HitOrderStatus.Filled:
@@ -779,7 +784,7 @@ namespace HitBTCVendor
                 string currency = item.Key;
                 decimal totalBalance = item.Value.total;
                 decimal availableBalance = item.Value.available;
-                decimal reservedBalance = item.Value.reserved;               
+                decimal reservedBalance = item.Value.reserved;
 
                 decimal estimatedBTC = 0;
                 decimal estimatedUSD = 0;
@@ -851,7 +856,7 @@ namespace HitBTCVendor
             HitError error = null;
 
             await Task.Factory.StartNew(() => this.UpdateBalances(this.updateBalancesCancellation.Token, out error))
-                .ContinueWith((t) => 
+                .ContinueWith((t) =>
                 {
                     if (error == null)
                         this.balancesCache.ForEach(b => this.PushMessage(b));

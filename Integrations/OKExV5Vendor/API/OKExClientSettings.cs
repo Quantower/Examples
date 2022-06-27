@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 namespace OKExV5Vendor.API
 {
     class OKExClientSettings

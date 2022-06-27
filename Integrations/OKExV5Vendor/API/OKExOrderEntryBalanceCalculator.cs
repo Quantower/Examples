@@ -1,5 +1,7 @@
+// Copyright QUANTOWER LLC. � 2017-2022. All rights reserved.
+
 using OKExV5Vendor.API.Misc;
-using OKExV5Vendor.API.OrderType;
+using OKExV5Vendor.API.OrderTypes;
 using OKExV5Vendor.API.REST.Models;
 using TradingPlatform.BusinessLayer;
 
@@ -393,8 +395,8 @@ namespace OKExV5Vendor.API
             }
             else if (this.IsContractBasedSymbol)
             {
-                this.TotalAsset = this.CurrentSymbol.Product;
-                this.BalanceAsset = this.CurrentSymbol.Product;
+                this.TotalAsset = this.CurrentSymbol.QuotingCurrency;
+                this.BalanceAsset = this.CurrentSymbol.QuotingCurrency;
             }
             else
             {

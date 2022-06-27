@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OKExV5Vendor.API;
@@ -133,7 +135,7 @@ namespace OKExV5Vendor.Market
 
                 this.indexSubscriberCache[symbol.OKExInstrumentId] = subscriber;
 
-                if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out string channelName))
+                if (this.TryGetChannelName(symbol, OKExSubscriptionType.Ticker, out string channelName))
                     this.publicWebsocket.AddRequestToQueue(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
             }
         }
@@ -147,12 +149,12 @@ namespace OKExV5Vendor.Market
                 subscriber.RemoveChannel(OKExSubscriptionType.Ticker);
                 this.indexSubscriberCache.Remove(symbol.OKExInstrumentId);
 
-                if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out string channelName))
+                if (this.TryGetChannelName(symbol, OKExSubscriptionType.Ticker, out string channelName))
                     this.publicWebsocket.RemoveFromQueue(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
             }
         }
 
-        internal void SubscribeFundingRates()
+        internal void SubscribeFundingRate()
         {
             var futures = this.SymbolsProvider.GetSymbols(OKExInstrumentType.Swap);
 
@@ -182,13 +184,13 @@ namespace OKExV5Vendor.Market
             if (okexSubscriber.SubscriptionCount == 0)
             {
                 okexSubscriber.AddSubscription(OKExSubscriptionType.Ticker);
-                if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out string channelName))
+                if (this.TryGetChannelName(symbol, OKExSubscriptionType.Ticker, out string channelName))
                     args.Add(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
 
                 if (okexSubscriber.Symbol.InstrumentType != OKExInstrumentType.Spot)
                 {
                     okexSubscriber.AddSubscription(OKExSubscriptionType.OpenInterest);
-                    if (symbol.TryGetChannelName(OKExSubscriptionType.OpenInterest, out channelName))
+                    if (this.TryGetChannelName(symbol, OKExSubscriptionType.OpenInterest, out channelName))
                         args.Add(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
                 }
             }
@@ -197,7 +199,7 @@ namespace OKExV5Vendor.Market
             {
                 okexSubscriber.AddSubscription(type);
 
-                if (symbol.TryGetChannelName(type, out string channelName))
+                if (this.TryGetChannelName(symbol, type, out string channelName))
                     args.Add(new OKExChannelRequest() { ChannelName = channelName, InstrumentId = symbol.OKExInstrumentId });
 
                 if (args.Count > 0)
@@ -215,7 +217,7 @@ namespace OKExV5Vendor.Market
             var channelArgs = new List<OKExChannelRequest>();
             okexSubscriber.RemoveChannel(type);
 
-            if (symbol.TryGetChannelName(type, out string channelName))
+            if (this.TryGetChannelName(symbol, type, out string channelName))
             {
                 channelArgs.Add(new OKExChannelRequest()
                 {
@@ -227,7 +229,7 @@ namespace OKExV5Vendor.Market
             if (!okexSubscriber.ContainsAnyMainSubscription())
             {
                 okexSubscriber.RemoveChannel(OKExSubscriptionType.Ticker);
-                if (symbol.TryGetChannelName(OKExSubscriptionType.Ticker, out channelName))
+                if (this.TryGetChannelName(symbol, OKExSubscriptionType.Ticker, out channelName))
                 {
                     channelArgs.Add(new OKExChannelRequest()
                     {
@@ -239,7 +241,7 @@ namespace OKExV5Vendor.Market
                 if (symbol.InstrumentType != OKExInstrumentType.Spot)
                 {
                     okexSubscriber.RemoveChannel(OKExSubscriptionType.OpenInterest);
-                    if (symbol.TryGetChannelName(OKExSubscriptionType.OpenInterest, out channelName))
+                    if (this.TryGetChannelName(symbol, OKExSubscriptionType.OpenInterest, out channelName))
                     {
                         channelArgs.Add(new OKExChannelRequest()
                         {
@@ -346,8 +348,29 @@ namespace OKExV5Vendor.Market
                         {
                             if (this.subscriberCache.TryGetValue(instrumentId, out var subscriber))
                             {
+                                var isFirstMessage = subscriber.LastTrade == null;
+
                                 foreach (var t in data.ToObject<OKExTradeItem[]>())
-                                    this.OnNewTrade?.Invoke(subscriber.Symbol, t);
+                                {
+                                    if (!isFirstMessage)
+                                        this.OnNewTrade?.Invoke(subscriber.Symbol, t);
+
+                                    subscriber.LastTrade = t;
+                                }
+                            }
+                            break;
+                        }
+                    case OKExChannels.BBO_TBT:
+                        {
+                            if (this.subscriberCache.TryGetValue(instrumentId, out var subscriber))
+                            {
+                                var book = data.ToObject<OKExOrderBook[]>()?.FirstOrDefault();
+
+                                if (book != null && book.Asks?.Length > 0 && book.Bids?.Length > 0)
+                                {
+                                    if (subscriber.TryUpdateQuote(ref book.Bids[0], ref book.Asks[0], book.Time, out var quote))
+                                        this.OnNewQuote?.Invoke(subscriber.Symbol, quote);
+                                }
                             }
                             break;
                         }
@@ -359,11 +382,8 @@ namespace OKExV5Vendor.Market
                                 {
                                     var isFirstMessage = subscriber.LastTicker == null;
 
-                                    if (subscriber.TryUpdateTicker(ticker, out bool isQuoteChanged))
+                                    if (subscriber.TryUpdateTicker(ticker))
                                         this.OnNewTicker(subscriber.Symbol, ticker, subscriber.OpenInterest, isFirstMessage);
-
-                                    if (isQuoteChanged)
-                                        this.OnNewQuote?.Invoke(subscriber.Symbol, ticker);
                                 }
                             }
                             break;
@@ -386,6 +406,7 @@ namespace OKExV5Vendor.Market
                             break;
                         }
                     case OKExChannels.ORDER_BOOK_400:
+                    case OKExChannels.ORDER_BOOK_400_TBT:
                         {
                             if (this.subscriberCache.TryGetValue(instrumentId, out var subscriber))
                             {
@@ -509,6 +530,43 @@ namespace OKExV5Vendor.Market
             }
         }
         protected void CallOnErrorEvent(string message) => this.OnError?.Invoke(message);
+
+        protected virtual bool TryGetChannelName(OKExSymbol symbol, OKExSubscriptionType subscriptionType, out string channelName)
+        {
+            channelName = null;
+
+            switch (subscriptionType)
+            {
+                case OKExSubscriptionType.Last:
+                    channelName = OKExChannels.TRADES;
+                    break;
+                case OKExSubscriptionType.Mark:
+                    channelName = OKExChannels.MARK_PRICE;
+                    break;
+                case OKExSubscriptionType.Level2:
+                    channelName = OKExChannels.ORDER_BOOK_400;
+                    break;
+                case OKExSubscriptionType.Ticker:
+                    {
+                        if (symbol.InstrumentType == OKExInstrumentType.Index)
+                            channelName = OKExChannels.INDEX_TICKERS;
+                        else
+                            channelName = OKExChannels.TICKERS;
+                        break;
+                    }
+                case OKExSubscriptionType.Quote:
+                    {
+                        channelName = OKExChannels.BBO_TBT;
+                        break;
+                    }
+                case OKExSubscriptionType.OpenInterest:
+                    channelName = OKExChannels.OPEN_INTEREST;
+                    break;
+            }
+
+            return channelName != null;
+
+        }
 
         #endregion Misc
     }

@@ -1,6 +1,7 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using OKExV5Vendor.API;
 using OKExV5Vendor.API.Misc;
-using OKExV5Vendor.API.OrderType;
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket.Models;
 using OKExV5Vendor.Market;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OKExV5Vendor.API.OrderTypes;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 
@@ -202,6 +204,11 @@ namespace OKExV5Vendor.Trading
                 Name = Rule.LEVEL2_IS_AGGREGATED,
                 Value = true
             });
+            rules.Add(new MessageRule
+            {
+                Name = Rule.PLACE_ORDER_TRADING_OPERATION_HAS_ORDER_ID,
+                Value = true
+            });
             rules.Add(new MessageRule()
             {
                 Name = Rule.ALLOW_MODIFY_ORDER,
@@ -281,7 +288,8 @@ namespace OKExV5Vendor.Trading
 
             return new PnL()
             {
-                GrossPnL = grossPnl
+                GrossPnL = grossPnl,
+                Swaps = position.Interest.HasValue ? new PnLItem() { Value = position.Interest.Value } : null
             };
         }
         public override IList<OrderType> GetAllowedOrderTypes(CancellationToken token)
@@ -856,8 +864,8 @@ namespace OKExV5Vendor.Trading
                 row.AddCell(o.ActualSize ?? double.NaN, new VolumeFormattingDescription(o.ActualSize ?? double.NaN, o.UniqueInstrumentId));
                 row.AddCell(o.ActualPrice ?? double.NaN, new PriceFormattingDescription(o.ActualPrice ?? double.NaN, o.UniqueInstrumentId));
                 row.AddCell(o.ActualSide);
-                row.AddCell(o.CreationTime, new DateTimeFormatterDescription(o.CreationTime));
-                row.AddCell(o.TriggerTime, new DateTimeFormatterDescription(o.TriggerTime));
+                row.AddCell(o.CreationTime, new DateTimeFormattingDescription(o.CreationTime));
+                row.AddCell(o.TriggerTime, new DateTimeFormattingDescription(o.TriggerTime));
 
                 report.Rows.Add(row);
 
@@ -936,8 +944,8 @@ namespace OKExV5Vendor.Trading
                 row.AddCell(o.FeeCurrency);
                 row.AddCell(o.Fee ?? double.NaN, new PriceFormattingDescription(o.Fee ?? double.NaN, o.UniqueInstrumentId));
                 row.AddCell(o.PnL ?? double.NaN, new PriceFormattingDescription(o.PnL ?? double.NaN, o.UniqueInstrumentId));
-                row.AddCell(o.CreationTime, new DateTimeFormatterDescription(o.CreationTime));
-                row.AddCell(o.UpdateTime, new DateTimeFormatterDescription(o.UpdateTime));
+                row.AddCell(o.CreationTime, new DateTimeFormattingDescription(o.CreationTime));
+                row.AddCell(o.UpdateTime, new DateTimeFormattingDescription(o.UpdateTime));
 
                 report.Rows.Add(row);
             }
@@ -991,7 +999,7 @@ namespace OKExV5Vendor.Trading
                 row.AddCell(o.State.GetDescription());
                 row.AddCell(o.From);
                 row.AddCell(o.To);
-                row.AddCell(o.CreationTime, new DateTimeFormatterDescription(o.CreationTime));
+                row.AddCell(o.CreationTime, new DateTimeFormattingDescription(o.CreationTime));
 
                 report.Rows.Add(row);
             }
@@ -1047,7 +1055,7 @@ namespace OKExV5Vendor.Trading
                 row.AddCell(o.State.GetDescription());
                 row.AddCell(o.From);
                 row.AddCell(o.To);
-                row.AddCell(o.CreationTime, new DateTimeFormatterDescription(o.CreationTime));
+                row.AddCell(o.CreationTime, new DateTimeFormattingDescription(o.CreationTime));
 
                 report.Rows.Add(row);
             }
@@ -1439,12 +1447,19 @@ namespace OKExV5Vendor.Trading
                             LastUpdateTime = algoOrder.CreationTime,
                         };
 
-                        message.TriggerPrice = algoOrder.TakeProfitTriggerPrice ?? algoOrder.StopLossTriggerPrice ?? double.NaN;
+                        if (algoOrder.HasStopLossTriggerPrice)
+                            message.TriggerPrice = algoOrder.StopLossTriggerPrice.Value;
+                        else if (algoOrder.HasTakeProfitTriggerPrice)
+                            message.TriggerPrice = algoOrder.TakeProfitTriggerPrice.Value;
 
                         if (algoOrder.HasStopLossPrice || algoOrder.HasTakeProfitPrice)
                         {
                             message.OrderTypeId = OrderType.StopLimit;
-                            message.Price = algoOrder.TakeProfitPrice ?? algoOrder.StopLossPrice ?? double.NaN;
+
+                            if (algoOrder.HasStopLossPrice)
+                                message.Price = algoOrder.StopLossPrice.Value;
+                            else if (algoOrder.HasTakeProfitPrice)
+                                message.Price = algoOrder.TakeProfitPrice.Value;
                         }
                         else
                             message.OrderTypeId = OrderType.Stop;
@@ -1552,7 +1567,7 @@ namespace OKExV5Vendor.Trading
                 Side = position.ToTerminalSide(symbol),
                 Quantity = position.Quantity.Value,
                 OpenPrice = position.AveragePrice.Value,
-                OpenTime = position.CreationTime
+                OpenTime = position.CreationTime,
             };
 
             return true;

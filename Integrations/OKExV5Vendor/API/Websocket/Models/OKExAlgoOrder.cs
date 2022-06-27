@@ -1,3 +1,5 @@
+// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+
 using Newtonsoft.Json;
 using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.REST.JsonConverters;
@@ -85,9 +87,12 @@ namespace OKExV5Vendor.API.Websocket.Models
         internal long? _cTime;
         public DateTime CreationTime => this._cTime.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._cTime.Value).UtcDateTime : default;
 
-        public bool HasStopLossPrice => this.StopLossPrice.HasValue && this.StopLossPrice != MARKET_PRICE_INDICATOR;
-        public bool HasTakeProfitPrice => this.TakeProfitPrice.HasValue && this.TakeProfitPrice != MARKET_PRICE_INDICATOR;
-        public bool HasPrice => this.Price.HasValue && this.Price != MARKET_PRICE_INDICATOR;
+        public bool HasStopLossPrice => this.StopLossPrice.HasValue && this.StopLossPrice != MARKET_PRICE_INDICATOR && this.StopLossPrice != 0;
+        public bool HasTakeProfitPrice => this.TakeProfitPrice.HasValue && this.TakeProfitPrice != MARKET_PRICE_INDICATOR && this.TakeProfitPrice != 0;
+        public bool HasStopLossTriggerPrice => this.StopLossTriggerPrice.HasValue && this.StopLossTriggerPrice != 0;
+        public bool HasTakeProfitTriggerPrice => this.TakeProfitTriggerPrice.HasValue && this.TakeProfitTriggerPrice != 0;
+
+        public bool HasPrice => this.Price.HasValue && this.Price != MARKET_PRICE_INDICATOR && this.Price != default;
 
         public bool IsCancelling { get; internal set; }
 

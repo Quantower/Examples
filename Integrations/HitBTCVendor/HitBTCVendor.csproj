@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <OutputPath>$(SolutionDir)bin/bin/Vendors/$(AssemblyName)</OutputPath>
+    <OutputPath>$(SolutionDir)out/TradingPlatform/v1.0.0/bin/Vendors/$(AssemblyName)</OutputPath>
     <Platforms>AnyCPU;x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
