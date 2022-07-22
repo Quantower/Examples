@@ -44,10 +44,10 @@ namespace SimpleMACross
 
         public override string[] MonitoringConnectionsIds => new string[] { this.CurrentSymbol?.ConnectionId, this.CurrentAccount?.ConnectionId };
 
-        public Indicator indicatorFastMA;
-        public Indicator indicatorSlowMA;
+        private Indicator indicatorFastMA;
+        private Indicator indicatorSlowMA;
 
-        public HistoricalData hdm;
+        private HistoricalData hdm;
 
         private int longPositionsCount;
         private int shortPositionsCount;
@@ -65,6 +65,14 @@ namespace SimpleMACross
 
         protected override void OnRun()
         {
+            // Restore account object from acive connection
+            if (this.CurrentAccount != null && this.CurrentAccount.State == BusinessObjectState.Fake)
+                this.CurrentAccount = Core.Instance.GetAccount(this.CurrentAccount.CreateInfo());
+
+            // Restore symbol object from acive connection
+            if (this.CurrentSymbol != null && this.CurrentSymbol.State == BusinessObjectState.Fake)
+                this.CurrentSymbol = Core.Instance.GetSymbol(this.CurrentSymbol.CreateInfo());
+
             if (this.CurrentSymbol == null || this.CurrentAccount == null || this.CurrentSymbol.ConnectionId != this.CurrentAccount.ConnectionId)
             {
                 this.Log("Incorrect input parameters... Symbol or Account are not specified or they have different connectionID.", StrategyLoggingLevel.Error);
@@ -92,7 +100,7 @@ namespace SimpleMACross
             this.hdm.HistoryItemUpdated += this.Hdm_HistoryItemUpdated;
 
             this.hdm.AddIndicator(this.indicatorFastMA);
-            this.hdm.AddIndicator(this.indicatorSlowMA);            
+            this.hdm.AddIndicator(this.indicatorSlowMA);
         }
 
         protected override void OnStop()
@@ -103,14 +111,17 @@ namespace SimpleMACross
             Core.OrdersHistoryAdded -= this.Core_OrdersHistoryAdded;
 
             if (this.hdm != null)
+            {
                 this.hdm.HistoryItemUpdated -= this.Hdm_HistoryItemUpdated;
+                this.hdm.Dispose();
+            }
 
             base.OnStop();
         }
 
         protected override List<StrategyMetric> OnGetMetrics()
         {
-            List<StrategyMetric> result = base.OnGetMetrics();
+            var result = base.OnGetMetrics();
 
             // An example of adding custom strategy metrics:
             result.Add("Total long positions", this.longPositionsCount.ToString());
@@ -125,7 +136,7 @@ namespace SimpleMACross
             this.longPositionsCount = positions.Count(x => x.Side == Side.Buy);
             this.shortPositionsCount = positions.Count(x => x.Side == Side.Sell);
 
-            var currentPositionsQty = positions.Sum(x => x.Side == Side.Buy ? x.Quantity : -x.Quantity);
+            double currentPositionsQty = positions.Sum(x => x.Side == Side.Buy ? x.Quantity : -x.Quantity);
 
             if (Math.Abs(currentPositionsQty) == this.Quantity)
                 this.waitOpenPosition = false;
@@ -177,13 +188,13 @@ namespace SimpleMACross
                     {
                         var result = item.Close();
 
-                        if(result.Status == TradingOperationResultStatus.Failure)
+                        if (result.Status == TradingOperationResultStatus.Failure)
                             this.ProcessTradingRefuse();
                         else
                             this.Log($"Position was close: {result.Status}", StrategyLoggingLevel.Trading);
                     }
                 }
-            }            
+            }
             else
             {
                 //Открытие новых позиций
@@ -191,7 +202,7 @@ namespace SimpleMACross
                 {
                     this.waitOpenPosition = true;
                     this.Log("Start open buy position");
-                    TradingOperationResult result = Core.Instance.PlaceOrder(new PlaceOrderRequestParameters()
+                    var result = Core.Instance.PlaceOrder(new PlaceOrderRequestParameters()
                     {
                         Account = this.CurrentAccount,
                         Symbol = this.CurrentSymbol,
@@ -210,7 +221,7 @@ namespace SimpleMACross
                 {
                     this.waitOpenPosition = true;
                     this.Log("Start open sell position");
-                    TradingOperationResult result = Core.Instance.PlaceOrder(new PlaceOrderRequestParameters()
+                    var result = Core.Instance.PlaceOrder(new PlaceOrderRequestParameters()
                     {
                         Account = this.CurrentAccount,
                         Symbol = this.CurrentSymbol,
