@@ -46,8 +46,8 @@ namespace BrowserBasedPlugin
         private void OnLoginButtonClick(string elementId, object args)
         {
             // Get data from HTML elements by element id
-            string login = this.Window.Browser.GetHtmlValue("usernametextbox", HtmlGetValueAction.GetProperty, "value").Result.Result.ToString();
-            string password = this.Window.Browser.GetHtmlValue("passwordtextbox", HtmlGetValueAction.GetProperty, "value").Result.Result.ToString();
+            string login = this.Window.Browser.GetHtmlValue("usernametextbox", HtmlGetValueAction.GetProperty, "value").Result.ToString();
+            string password = this.Window.Browser.GetHtmlValue("passwordtextbox", HtmlGetValueAction.GetProperty, "value").Result.ToString();
 
             Application.Instance.Notifications.ShowConfirmation("Entered Login: " + login + " Password: " + password, null);
         }
