@@ -17,6 +17,7 @@ namespace BrowserBasedPlugin
                 Group = PluginGroup.Trading,
                 ShortName = "BBP",
                 TemplateName = "layout.html",
+                FolderName = "../../../../Settings/Scripts/plug-ins/BrowserBasedPlugin",
                 WindowParameters = new NativeWindowParameters(NativeWindowParameters.Panel)
                 {
                     AllowsTransparency = false,

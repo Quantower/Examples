@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Platforms>AnyCPU;x64</Platforms>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>BrowserBasedPlugin</AssemblyName>
+    <RootNamespace>BrowserBasedPlugin</RootNamespace>
+  </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>D:\Quantower\Settings\Scripts\plug-ins\BrowserBasedPlugin</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutputPath>D:\Quantower\Settings\Scripts\plug-ins\BrowserBasedPlugin</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutputPath>D:\Quantower\Settings\Scripts\plug-ins\BrowserBasedPlugin</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OutputPath>D:\Quantower\Settings\Scripts\plug-ins\BrowserBasedPlugin</OutputPath>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Content Include="html\layout.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="TradingPlatform.BusinessLayer">
+      <HintPath>D:\Quantower\TradingPlatform\v1.127.11\bin\TradingPlatform.BusinessLayer.dll</HintPath>
+      <CopyLocal>False</CopyLocal>
+    </Reference>
+    <Reference Include="TradingPlatform.PresentationLayer.Plugins">
+      <HintPath>D:\Quantower\TradingPlatform\v1.127.11\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
+      <CopyLocal>False</CopyLocal>
+    </Reference>
+  </ItemGroup>
+
+</Project>

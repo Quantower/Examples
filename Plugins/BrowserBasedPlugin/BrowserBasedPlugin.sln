@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29326.143
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BrowserBasedPlugin", "CustomPlugin\BrowserBasedPlugin.csproj", "{50C1C549-89E9-4DD4-A1D1-525E79822C38}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BrowserBasedPlugin", "BrowserBasedPlugin\BrowserBasedPlugin.csproj", "{50C1C549-89E9-4DD4-A1D1-525E79822C38}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
