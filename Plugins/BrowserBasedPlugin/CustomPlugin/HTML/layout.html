@@ -3,6 +3,8 @@
 <head>
 	<title>Login V10</title>
 	<meta charset="UTF-8">
+    <link rel="stylesheet" href="../../../themes/default/css/colors.css"/>
+    <link rel="stylesheet" href="../../../themes/default/css/core.css" />
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<script>
 
@@ -17,34 +19,45 @@
     </script>
 </head>
 <body>
-	
-	<div class="limiter">
-		<div class="container-login100">
-			<div class="wrap-login100 p-t-50 p-b-90">
-				<div>					
-					<div>
-						<input id ="usernametextbox" type="text" name="username" placeholder="Username">						
-					</div>
+   <panel class="autoHeight shadow" style="width:420px" id="panel">
+	   <panelHeader draggable="true">
+		   <panelTitle id="window_title">
+			   <panelTitleText id="window_title_text">An example</panelTitleText>
+		   </panelTitle>
+		   <panelControls>
+			   <icon id="window_close" class="close"></icon>
+		   </panelControls>
+	   </panelHeader>
+		<panelBody>
+			<div class="limiter">
+			<div class="container-login100">
+				<div class="wrap-login100 p-t-50 p-b-90">
+					<div>					
+						<div>
+							<input id ="usernametextbox" type="text" name="username" placeholder="Username">						
+						</div>
 										
-					<div>
-						<input id="passwordtextbox" type="password" name="pass" placeholder="Password">						
-					</div>
+						<div>
+							<input id="passwordtextbox" type="password" name="pass" placeholder="Password">						
+						</div>
 										
-					<div>
-						<button id="loginbutton" class="login100-form-btn">
-							Login
-						</button>
-						<button id="clearbutton" class="login100-form-btn">
-							Clear
-						</button>
-						<button id="callJSFunctionbutton" class="login100-form-btn">
-							Call JS function
-						</button>
+						<div>
+							<button id="loginbutton" class="login100-form-btn">
+								Login
+							</button>
+							<button id="clearbutton" class="login100-form-btn">
+								Clear
+							</button>
+							<button id="callJSFunctionbutton" class="login100-form-btn">
+								Call JS function
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-	</div>
+	</panelBody>
+  </panel>
 
 </body>
 </html>

@@ -19,11 +19,15 @@ namespace BrowserBasedPlugin
                 TemplateName = "layout.html",
                 WindowParameters = new NativeWindowParameters(NativeWindowParameters.Panel)
                 {
-                    AllowsTransparency = false,
-                    ResizeMode = NativeResizeMode.CanResize,
+                    AllowsTransparency = true,
+                    ResizeMode = NativeResizeMode.NoResize,
                     HeaderVisible = true,
                     BindingBehaviour = BindingBehaviour.Bindable,
                     StickingEnabled = StickyWindowBehavior.AllowSticking,
+                    AllowMaximizeButton = false,
+                    AllowFullScreenButton= false,
+                    AllowActionsButton = false,
+                    AllowCloseButton = true
                 },
                 CustomProperties = new Dictionary<string, object>()
                 {                
@@ -31,7 +35,7 @@ namespace BrowserBasedPlugin
                 }
             };
         }
-        public override Size DefaultSize => new Size(800, 600);
+        public override Size DefaultSize => new Size(440, 400);
 
         public override void Initialize()
         {
