@@ -35,17 +35,26 @@ namespace ApiExamples
             var totalVolume = 100; 
             var minTradeVolume = 0;
             var maxTradeVolume = 100000;
-            var timeInverval = 5;
-            var basisTimeInterval = 300;
+            var timeInterval = 5;
+            var basisVolumeInterval = 300;
             var minZoneHeight = 0;
             var maxZoneHeight = 100000;
             var deltaFilter = 50;
-            var basisRationFilter = 0;
+            var basisRatioFilter = 0;
 
             // 1. Download ticks history
             // 2. Calculate 'PowerTrades' items (according to given parameters)
             // 3. Store them into 'HistoricalData' instance
-            var powerTradesHistoricalData = symbol.GetPowerTradesHistory(totalVolume, minTradeVolume, maxTradeVolume, timeInverval, basisTimeInterval, minZoneHeight, maxZoneHeight, deltaFilter, basisRationFilter, cts.Token, fromTime, toTime);
+            var powerTradesHistoricalData = symbol.GetHistory(new HistoryRequestParameters()
+            {
+                Aggregation = new HistoryAggregationPowerTrades(totalVolume, minTradeVolume, maxTradeVolume, timeInterval, basisVolumeInterval, minZoneHeight, maxZoneHeight, deltaFilter, basisRatioFilter),
+                FromTime = fromTime,
+                ToTime = toTime,
+                Symbol = symbol,
+                CancellationToken = cts.Token,
+                HistoryType = HistoryType.Last,
+                Period = Period.TICK1,
+            });
 
             // process historical 'PowerTrades' items
             for (int i = 0; i < powerTradesHistoricalData.Count; i++)
