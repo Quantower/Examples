@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using TradingPlatform.BusinessLayer;
+using TradingPlatform.BusinessLayer.History.Aggregations;
 using TradingPlatform.BusinessLayer.PowerTrades;
 
 namespace ApiExamples
@@ -32,22 +33,25 @@ namespace ApiExamples
             var toTime = default(DateTime);
 
             // define PowerTrades parameters
-            var totalVolume = 100; 
-            var minTradeVolume = 0;
-            var maxTradeVolume = 100000;
-            var timeInterval = 5;
-            var basisVolumeInterval = 300;
-            var minZoneHeight = 0;
-            var maxZoneHeight = 100000;
-            var deltaFilter = 50;
-            var basisRatioFilter = 0;
+            var parameters = new HistoryAggregationPowerTradesParameters()
+            {
+                TotalVolume = 100,
+                MinTradeVolume = 0,
+                MaxTradeVolume = 100000,
+                TimeInterval = 5,
+                BasisVolumeInterval = 300,
+                MinZoneHeight = 0,
+                MaxZoneHeight = 100000,
+                DeltaFilter = 50,
+                BasisRatioFilter = 0,
+            };
 
             // 1. Download ticks history
             // 2. Calculate 'PowerTrades' items (according to given parameters)
             // 3. Store them into 'HistoricalData' instance
             var powerTradesHistoricalData = symbol.GetHistory(new HistoryRequestParameters()
             {
-                Aggregation = new HistoryAggregationPowerTrades(totalVolume, minTradeVolume, maxTradeVolume, timeInterval, basisVolumeInterval, minZoneHeight, maxZoneHeight, deltaFilter, basisRatioFilter),
+                Aggregation = new HistoryAggregationPowerTrades(parameters),
                 FromTime = fromTime,
                 ToTime = toTime,
                 Symbol = symbol,
