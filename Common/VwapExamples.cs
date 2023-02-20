@@ -29,7 +29,7 @@ class VwapExamples
         // create CancellationTokenSource instance
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        // from 1-Day min before
+        // from 1 Day before
         var fromTime = Core.Instance.TimeUtils.DateTimeUtcNow.AddDays(-1);
 
         // to now (and process real-time data)
@@ -44,7 +44,7 @@ class VwapExamples
             Period = Period.HOUR1,                                          // VWAP period.
             PriceType = VwapPriceType.HLC3,                                 // PriceType. Only works with 'VwapDataType.CurrentTF' 
             StdCalculationType = VwapStdCalculationType.StandardDeviation,  // STD formula
-            TimeZone = Core.Instance.TimeUtils.SelectedTimeZone,            // Required for correct calculation of VWAP periods.
+            TimeZone = Core.Instance.TimeUtils.SelectedTimeZone,            // Use terminal timezone, by default
         };
 
         // 1. Download data history
@@ -58,7 +58,7 @@ class VwapExamples
             ToTime = toTime,
             CancellationToken = cts.Token,
             HistoryType = symbol.HistoryType,                      // Last, Mark, Bid, Ask etc. (Depends on data feed) 
-            SessionsContainer = DefaultSessionsContainer.Instance, // Default (it means full day). Required for correct calculation of VWAP periods.
+            SessionsContainer = DefaultSessionsContainer.Instance, // Default session (it means full day).
         });
 
         // process historical 'VWAP' items
