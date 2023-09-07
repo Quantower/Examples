@@ -7,7 +7,7 @@ using TradingPlatform.BusinessLayer;
 
 namespace SimpleMACross
 {
-    public class SimpleMACross : Strategy, ICurrentAccount, ICurrentSymbol
+    public sealed class SimpleMACross : Strategy, ICurrentAccount, ICurrentSymbol
     {
         [InputParameter("Symbol", 0)]
         public Symbol CurrentSymbol { get; set; }
@@ -19,28 +19,34 @@ namespace SimpleMACross
         public Account CurrentAccount { get; set; }
 
         /// <summary>
-        /// Period to load history
-        /// </summary>
-        [InputParameter("Period", 5)]
-        private Period period = Period.MIN5;
-
-        /// <summary>
         /// Period for Fast MA indicator
         /// </summary>
         [InputParameter("Fast MA", 2, minimum: 1, maximum: 100, increment: 1, decimalPlaces: 0)]
-        public int FastMA = 5;
+        public int FastMA { get; set; }
 
         /// <summary>
         /// Period for Slow MA indicator
         /// </summary>
         [InputParameter("Slow MA", 3, minimum: 1, maximum: 100, increment: 1, decimalPlaces: 0)]
-        public int SlowMA = 10;
+        public int SlowMA { get; set; }
 
         /// <summary>
         /// Quantity to open order
         /// </summary>
         [InputParameter("Quantity", 4, 0.1, 99999, 0.1, 2)]
-        public double Quantity = 1.0;
+        public double Quantity { get; set; }
+
+        /// <summary>
+        /// Period to load history
+        /// </summary>
+        [InputParameter("Period", 5)]
+        public Period Period { get; set; }
+
+        /// <summary>
+        /// Start point to load history
+        /// </summary>
+        [InputParameter("Start point", 6)]
+        public DateTime StartPoint { get; set; }
 
         public override string[] MonitoringConnectionsIds => new string[] { this.CurrentSymbol?.ConnectionId, this.CurrentAccount?.ConnectionId };
 
@@ -56,26 +62,49 @@ namespace SimpleMACross
         private bool waitOpenPosition;
         private bool waitClosePositions;
 
+        private double totalNetPl;
+        private double totalGrossPl;
+        private double totalFee;
+
         public SimpleMACross()
             : base()
         {
             this.Name = "Simple MA Cross strategy";
             this.Description = "Raw strategy without any additional functional";
+
+            this.FastMA = 5;
+            this.SlowMA = 10;
+            this.Period = Period.MIN5;
+            this.StartPoint = Core.TimeUtils.DateTimeUtcNow.AddDays(-100);
         }
 
         protected override void OnRun()
         {
-            // Restore account object from acive connection
-            if (this.CurrentAccount != null && this.CurrentAccount.State == BusinessObjectState.Fake)
-                this.CurrentAccount = Core.Instance.GetAccount(this.CurrentAccount.CreateInfo());
+            this.totalNetPl = 0D;
 
-            // Restore symbol object from acive connection
+            // Restore symbol object from active connection
             if (this.CurrentSymbol != null && this.CurrentSymbol.State == BusinessObjectState.Fake)
                 this.CurrentSymbol = Core.Instance.GetSymbol(this.CurrentSymbol.CreateInfo());
 
-            if (this.CurrentSymbol == null || this.CurrentAccount == null || this.CurrentSymbol.ConnectionId != this.CurrentAccount.ConnectionId)
+            if (this.CurrentSymbol == null)
             {
-                this.Log("Incorrect input parameters... Symbol or Account are not specified or they have different connectionID.", StrategyLoggingLevel.Error);
+                this.Log("Incorrect input parameters... Symbol have not specified.", StrategyLoggingLevel.Error);
+                return;
+            }
+
+            // Restore account object from active connection
+            if (this.CurrentAccount != null && this.CurrentAccount.State == BusinessObjectState.Fake)
+                this.CurrentAccount = Core.Instance.GetAccount(this.CurrentAccount.CreateInfo());
+
+            if (this.CurrentAccount == null)
+            {
+                this.Log("Incorrect input parameters... Account have not specified.", StrategyLoggingLevel.Error);
+                return;
+            }
+
+            if (this.CurrentSymbol.ConnectionId != this.CurrentAccount.ConnectionId)
+            {
+                this.Log("Incorrect input parameters... Symbol and Account from different connections.", StrategyLoggingLevel.Error);
                 return;
             }
 
@@ -90,12 +119,14 @@ namespace SimpleMACross
             this.indicatorFastMA = Core.Instance.Indicators.BuiltIn.SMA(this.FastMA, PriceType.Close);
             this.indicatorSlowMA = Core.Instance.Indicators.BuiltIn.SMA(this.SlowMA, PriceType.Close);
 
-            this.hdm = this.CurrentSymbol.GetHistory(this.period, this.CurrentSymbol.HistoryType, Core.TimeUtils.DateTimeUtcNow.AddDays(-100));
+            this.hdm = this.CurrentSymbol.GetHistory(this.Period, this.CurrentSymbol.HistoryType, this.StartPoint);
 
             Core.PositionAdded += this.Core_PositionAdded;
             Core.PositionRemoved += this.Core_PositionRemoved;
 
             Core.OrdersHistoryAdded += this.Core_OrdersHistoryAdded;
+
+            Core.TradeAdded += this.Core_TradeAdded;
 
             this.hdm.HistoryItemUpdated += this.Hdm_HistoryItemUpdated;
 
@@ -110,6 +141,8 @@ namespace SimpleMACross
 
             Core.OrdersHistoryAdded -= this.Core_OrdersHistoryAdded;
 
+            Core.TradeAdded -= this.Core_TradeAdded;
+
             if (this.hdm != null)
             {
                 this.hdm.HistoryItemUpdated -= this.Hdm_HistoryItemUpdated;
@@ -119,15 +152,16 @@ namespace SimpleMACross
             base.OnStop();
         }
 
-        protected override List<StrategyMetric> OnGetMetrics()
+        protected override void OnInitializeMetrics(Meter meter)
         {
-            var result = base.OnGetMetrics();
+            base.OnInitializeMetrics(meter);
 
-            // An example of adding custom strategy metrics:
-            result.Add("Total long positions", this.longPositionsCount.ToString());
-            result.Add("Total short positions", this.shortPositionsCount.ToString());
+            meter.CreateObservableCounter("total-long-positions", () => this.longPositionsCount, description: "Total long positions");
+            meter.CreateObservableCounter("total-short-positions", () => this.shortPositionsCount, description: "Total short positions");
 
-            return result;
+            meter.CreateObservableCounter("total-pl-net", () => this.totalNetPl, description: "Total Net profit/loss");
+            meter.CreateObservableCounter("total-pl-gross", () => this.totalGrossPl, description: "Total Gross profit/loss");
+            meter.CreateObservableCounter("total-fee", () => this.totalFee, description: "Total fee");
         }
 
         private void Core_PositionAdded(Position obj)
@@ -164,6 +198,18 @@ namespace SimpleMACross
                 this.ProcessTradingRefuse();
         }
 
+        private void Core_TradeAdded(Trade obj)
+        {
+            if (obj.NetPnl != null)
+                this.totalNetPl += obj.NetPnl.Value;
+
+            if (obj.GrossPnl != null)
+                this.totalGrossPl += obj.GrossPnl.Value;
+
+            if (obj.Fee != null)
+                this.totalFee += obj.Fee.Value;
+        }
+
         private void Hdm_HistoryItemUpdated(object sender, HistoryEventArgs e) => this.OnUpdate();
 
         private void OnUpdate()
@@ -189,7 +235,10 @@ namespace SimpleMACross
                         var result = item.Close();
 
                         if (result.Status == TradingOperationResultStatus.Failure)
+                        {
+                            this.Log($"Close positions refuse: {(string.IsNullOrEmpty(result.Message) ? result.Status : result.Message)}", StrategyLoggingLevel.Trading);
                             this.ProcessTradingRefuse();
+                        }
                         else
                             this.Log($"Position was close: {result.Status}", StrategyLoggingLevel.Trading);
                     }
@@ -213,7 +262,10 @@ namespace SimpleMACross
                     });
 
                     if (result.Status == TradingOperationResultStatus.Failure)
+                    {
+                        this.Log($"Place buy order refuse: {(string.IsNullOrEmpty(result.Message) ? result.Status : result.Message)}", StrategyLoggingLevel.Trading);
                         this.ProcessTradingRefuse();
+                    }
                     else
                         this.Log($"Position open: {result.Status}", StrategyLoggingLevel.Trading);
                 }
@@ -232,7 +284,10 @@ namespace SimpleMACross
                     });
 
                     if (result.Status == TradingOperationResultStatus.Failure)
+                    {
+                        this.Log($"Place sell order refuse: {(string.IsNullOrEmpty(result.Message) ? result.Status : result.Message)}", StrategyLoggingLevel.Trading);
                         this.ProcessTradingRefuse();
+                    }
                     else
                         this.Log($"Position open: {result.Status}", StrategyLoggingLevel.Trading);
                 }
