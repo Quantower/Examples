@@ -1,19 +1,18 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 
-namespace Bitfinex.API.Models
+namespace Bitfinex.API.Models;
+
+public class BitfinexOrderResponse
 {
-    public class BitfinexOrderResponse
-    {
-        public DateTime Timestamp { get; internal set; }
+    public DateTime Timestamp { get; internal set; }
 
-        public string Type { get; internal set; }
+    public string Type { get; internal set; }
 
-        public BitfinexOrder[] Orders { get; internal set; }
+    public BitfinexOrder[] Orders { get; internal set; }
 
-        public string Status { get; internal set; }
+    public string Status { get; internal set; }
 
-        public string Text { get; internal set; }
-    }
+    public string Text { get; internal set; }
 }

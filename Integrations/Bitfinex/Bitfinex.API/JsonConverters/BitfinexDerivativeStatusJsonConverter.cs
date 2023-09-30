@@ -1,20 +1,20 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
-using System;
 using Bitfinex.API.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
 
-namespace Bitfinex.API.JsonConverters
+namespace Bitfinex.API.JsonConverters;
+
+internal class BitfinexDerivativeStatusJsonConverter : JsonConverter<BitfinexDerivativeStatus>
 {
-    internal class BitfinexDerivativeStatusJsonConverter : JsonConverter<BitfinexDerivativeStatus>
+    public override BitfinexDerivativeStatus ReadJson(JsonReader reader, Type objectType, BitfinexDerivativeStatus existingValue, bool hasExistingValue, JsonSerializer serializer)
     {
-        public override BitfinexDerivativeStatus ReadJson(JsonReader reader, Type objectType, BitfinexDerivativeStatus existingValue, bool hasExistingValue, JsonSerializer serializer)
-        {
-            var jArray = serializer.Deserialize<JArray>(reader);
+        var jArray = serializer.Deserialize<JArray>(reader);
 
-            var result = jArray.Count == 24 ?
-                new BitfinexDerivativeStatus
+        var result = jArray.Count == 24 ?
+            new BitfinexDerivativeStatus
             {
                 Symbol = jArray[0].Value<string>(),
                 Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(jArray[1].Value<long>()).UtcDateTime,
@@ -45,10 +45,8 @@ namespace Bitfinex.API.JsonConverters
                 ClampMax = jArray[22].Value<double?>()
             };
 
-            return result;
-        }
-
-        public override void WriteJson(JsonWriter writer, BitfinexDerivativeStatus value, JsonSerializer serializer)
-        { }
+        return result;
     }
+
+    public override void WriteJson(JsonWriter writer, BitfinexDerivativeStatus value, JsonSerializer serializer) { }
 }

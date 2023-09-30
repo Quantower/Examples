@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 using System.Diagnostics;
@@ -15,183 +15,212 @@ using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Integration;
 using TradingPlatform.BusinessLayer.Utils;
 
-namespace BitfinexVendor
+namespace BitfinexVendor;
+
+internal class BitfinexInternalVendor : Vendor
 {
-    internal class BitfinexInternalVendor : Vendor
+    #region Properties
+
+    private protected BitfinexApi Api { get; private set; }
+
+    private protected BitfinexContext Context { get; }
+
+    private readonly PingMeter pingMeter;
+
+    private protected CancellationToken GlobalCancellation => this.globalCancellation.Token;
+    private CancellationTokenSource globalCancellation;
+
+    private Timer timer;
+
+    private readonly DealTicketLimiter tooManyRequestsLimiter;
+
+    #endregion Properties
+
+    protected BitfinexInternalVendor()
     {
-        #region Properties
+        this.Context = new BitfinexContext();
+        this.pingMeter = new PingMeter(BitfinexVendor.VENDOR_NAME, "https://api-pub.bitfinex.com");
 
-        private protected BitfinexApi Api { get; private set; }
+        this.tooManyRequestsLimiter = new DealTicketLimiter(TimeSpan.FromSeconds(15));
+    }
 
-        private protected BitfinexContext Context { get; }
+    #region Connection
 
-        private readonly PingMeter pingMeter;
+    public override ConnectionResult Connect(ConnectRequestParameters parameters)
+    {
+        if (!NetworkInterface.GetIsNetworkAvailable())
+            return ConnectionResult.CreateFail(loc._("Network does not available"));
 
-        private protected CancellationToken GlobalCancellation => this.globalCancellation.Token;
-        private CancellationTokenSource globalCancellation;
+        this.Api = this.CreateApiClient(parameters);
 
-        private Timer timer;
+        if (!this.Api.IsConnected)
+            return ConnectionResult.CreateFail(loc._("Can't connect."));
 
-        private readonly DealTicketLimiter tooManyRequestsLimiter;
+        return ConnectionResult.CreateSuccess();
+    }
 
-        #endregion Properties
+    private protected virtual BitfinexApi CreateApiClient(ConnectRequestParameters parameters) => new(parameters.CancellationToken);
 
-        protected BitfinexInternalVendor()
+    public override void OnConnected(CancellationToken token)
+    {
+        this.globalCancellation = new CancellationTokenSource();
+
+        this.timer = new Timer(this.TimerCallback, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+
+        base.OnConnected(token);
+    }
+
+    public override void Disconnect()
+    {
+        if (this.timer != null)
         {
-            this.Context = new BitfinexContext();
-            this.pingMeter = new PingMeter(BitfinexVendor.VENDOR_NAME, "https://api-pub.bitfinex.com");
-
-            this.tooManyRequestsLimiter = new DealTicketLimiter(TimeSpan.FromSeconds(15));
+            this.timer.Change(Timeout.Infinite, Timeout.Infinite);
+            this.timer.Dispose();
         }
 
-        #region Connection
+        this.globalCancellation?.Cancel();
 
-        public override ConnectionResult Connect(ConnectRequestParameters parameters)
+        this.Api?.Dispose();
+        this.Context?.Dispose();
+
+        base.Disconnect();
+    }
+
+    public override PingResult Ping()
+    {
+        var result = new PingResult
         {
-            if (!NetworkInterface.GetIsNetworkAvailable())
-                return ConnectionResult.CreateFail(loc._("Network does not available"));
+            State = PingEnum.Disconnected
+        };
 
-            this.Api = this.CreateApiClient(parameters);
-
-            if (!this.Api.IsConnected)
-                return ConnectionResult.CreateFail(loc._("Can't connect."));
-
-            return ConnectionResult.CreateSuccess();
-        }
-
-        private protected virtual BitfinexApi CreateApiClient(ConnectRequestParameters parameters) => new(parameters.CancellationToken);
-
-        public override void OnConnected(CancellationToken token)
-        {
-            this.globalCancellation = new CancellationTokenSource();
-
-            this.timer = new Timer(this.TimerCallback, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-
-            base.OnConnected(token);
-        }
-
-        public override void Disconnect()
-        {
-            if (this.timer != null)
-            {
-                this.timer.Change(Timeout.Infinite, Timeout.Infinite);
-                this.timer.Dispose();
-            }
-
-            this.globalCancellation?.Cancel();
-
-            this.Api?.Dispose();
-            this.Context?.Dispose();
-
-            base.Disconnect();
-        }
-
-        public override PingResult Ping()
-        {
-            var result = new PingResult
-            {
-                State = PingEnum.Disconnected
-            };
-
-            if (this.Api is not { IsConnected: true })
-                return result;
-
-            try
-            {
-                var stopWatch = Stopwatch.StartNew();
-
-                this.Api.PublicWebSocketApi.Ping(this.GlobalCancellation);
-
-                stopWatch.Stop();
-
-                result.RoundTripTime = stopWatch.Elapsed;
-                result.PingTime = this.pingMeter.MeasurePing();
-                result.State = result.PingTime != null ? PingEnum.Connected : PingEnum.Disconnected;
-            }
-            catch (Exception ex)
-            {
-                Core.Instance.Loggers.Log(ex);
-            }
-
+        if (this.Api is not { IsConnected: true })
             return result;
+
+        try
+        {
+            var stopWatch = Stopwatch.StartNew();
+
+            this.Api.PublicWebSocketApi.Ping(this.GlobalCancellation);
+
+            stopWatch.Stop();
+
+            result.RoundTripTime = stopWatch.Elapsed;
+            result.PingTime = this.pingMeter.MeasurePing();
+            result.State = result.PingTime != null ? PingEnum.Connected : PingEnum.Disconnected;
+        }
+        catch (Exception ex)
+        {
+            Core.Instance.Loggers.Log(ex, nameof(this.Ping));
         }
 
-        #endregion Connection
+        return result;
+    }
 
-        #region Misc
+    #endregion Connection
 
-        private protected TResult HandleApiResponse<TResult>(Func<Task<TResult>> taskFunc, out string error, bool notify = false, bool retry = false)
+    #region Misc
+
+    private protected TResult HandleApiResponse<TResult>(Func<Task<TResult>> taskFunc, CancellationToken token, out string error, bool notify = false, bool retry = false, int iteration = 0)
+    {
+        error = default;
+
+        try
         {
-            error = default;
-
+            return taskFunc.Invoke().GetResultWithoutContextCapturing();
+        }
+        catch (ApiException aex)
+        {
             try
             {
-                return taskFunc.Invoke().GetResultWithoutContextCapturing();
-            }
-            catch (ApiException aex)
-            {
-                if (!string.IsNullOrEmpty(aex.Content))
+                var bitfinexError = JsonConvert.DeserializeObject<BitfinexError>(aex.Content);
+
+                if (bitfinexError != null)
                 {
-                    var bitfinexError = JsonConvert.DeserializeObject<BitfinexError>(aex.Content);
-                    error = bitfinexError?.Text;
-                }
-                else
-                    error = $"{aex.RequestMessage.RequestUri.LocalPath}. {aex.GetFullMessageRecursive()}";
-
-                if ((int)aex.StatusCode == 429)
-                {
-                    if (notify)
-                        notify = this.tooManyRequestsLimiter.AllowDealTicket();
-
-                    if (notify && !string.IsNullOrEmpty(error))
+                    if (bitfinexError.Code == BitfinexErrorCode.NONCE_TOO_SMALL)
                     {
-                        this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
-                        notify = false;
-                    }
+                        bool isConnectionInProgress = this.globalCancellation == null;
 
-                    if (retry && aex.Headers.TryGetValues("Retry-After", out var values))
-                    {
-                        string valueString = values.FirstOrDefault();
-                        if (!string.IsNullOrEmpty(valueString) && int.TryParse(valueString, out int value))
+                        if (!isConnectionInProgress && iteration >= 10)
+                            error = bitfinexError.Text;
+                        else if (this.Api.NonceOffset < long.MaxValue / 2)
                         {
-                            Task.Delay(TimeSpan.FromSeconds(value), this.GlobalCancellation).Wait(this.GlobalCancellation);
-                            return this.HandleApiResponse(taskFunc, out _, true, true);
+                            long newNonceOffset = isConnectionInProgress ?
+                                Math.Max(this.Api.NonceOffset, 1000) * 2 :  // ошибка в процессе подключения
+                                this.Api.NonceOffset++;                    // ошибка в процессе работы
+
+                            Core.Instance.Loggers.Log($"Nonce is too small. Nonce offset will be increased to {newNonceOffset}");
+
+                            this.Api.NonceOffset = newNonceOffset;
+
+                            return this.HandleApiResponse(taskFunc, token, out error, notify, retry, iteration + 1);
                         }
+                        else
+                            Core.Instance.Loggers.Log($"Nonce is too small, but nonce offset already too big ({this.Api.NonceOffset}). Try to use another api key and secret");
+                    }
+
+                    error = bitfinexError.Text;
+                }
+            }
+            catch
+            {
+                error = $"{aex.RequestMessage.RequestUri.LocalPath}. {aex.GetFullMessageRecursive()}";
+            }
+
+            if ((int)aex.StatusCode == 429)
+            {
+                if (notify)
+                    notify = this.tooManyRequestsLimiter.AllowDealTicket();
+
+                if (notify && !string.IsNullOrEmpty(error))
+                {
+                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                    notify = false;
+                }
+
+                if (retry && aex.Headers.TryGetValues("Retry-After", out var values))
+                {
+                    string valueString = values.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(valueString) && int.TryParse(valueString, out int value))
+                    {
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, this.GlobalCancellation);
+
+                        Task.Delay(TimeSpan.FromSeconds(value), linkedCts.Token).Wait(linkedCts.Token);
+                        return this.HandleApiResponse(taskFunc, token, out _, true, true);
                     }
                 }
             }
-            catch (TaskCanceledException)
-            {
-                // ignore
-            }
-            catch (Exception ex)
-            {
-                error = ex.GetFullMessageRecursive();
-            }
-
-            if (notify && !string.IsNullOrEmpty(error))
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
-
-            return default;
         }
-
-        #endregion Misc
-
-        private void TimerCallback(object state)
+        catch (TaskCanceledException)
         {
-            try
-            {
-                this.OnTimerTick();
-            }
-            catch (Exception ex)
-            {
-                Core.Instance.Loggers.Log(ex);
-            }
+            // ignore
         }
-
-        private protected virtual void OnTimerTick()
+        catch (Exception ex)
         {
-
+            error = ex.GetFullMessageRecursive();
         }
+
+        if (notify && !string.IsNullOrEmpty(error))
+            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+
+        return default;
+    }
+
+    #endregion Misc
+
+    private void TimerCallback(object state)
+    {
+        try
+        {
+            this.OnTimerTick();
+        }
+        catch (Exception ex)
+        {
+            Core.Instance.Loggers.Log(ex, nameof(this.TimerCallback));
+        }
+    }
+
+    private protected virtual void OnTimerTick()
+    {
+
     }
 }

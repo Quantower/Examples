@@ -1,15 +1,14 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System.Threading;
 using System.Threading.Tasks;
 using Bitfinex.API.Models;
 using Refit;
 
-namespace Bitfinex.API.Abstractions
+namespace Bitfinex.API.Abstractions;
+
+public interface IBitfinexRestApiV1
 {
-    public interface IBitfinexRestApiV1
-    {
-        [Get("/symbols_details")]
-        Task<BitfinexSymbolDetails[]> GetSymbolDetails(CancellationToken cancellation);
-    }
+    [Get("/symbols_details")]
+    Task<BitfinexSymbolDetails[]> GetSymbolDetails(CancellationToken cancellation);
 }

@@ -1,10 +1,9 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
-namespace Bitfinex.API.Models
+namespace Bitfinex.API.Models;
+
+public static class BitfinexMarginKey
 {
-    public static class BitfinexMarginKey
-    {
-        public const string BASE = "base";
-        public const string ALL_SYMBOLS = "sym_all";
-    }
+    public const string BASE = "base";
+    public const string ALL_SYMBOLS = "sym_all";
 }

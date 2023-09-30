@@ -1,17 +1,16 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 
-namespace Bitfinex.API.Models
+namespace Bitfinex.API.Models;
+
+[Flags]
+public enum BitfinexOrderFlags
 {
-    [Flags]
-    public enum BitfinexOrderFlags
-    {
-        Hidden = 64,
-        Close = 512,
-        ReduceOnly = 1024,
-        PostOnly = 4096,
-        Oco = 16384,
-        NoVarRates = 524288
-    }
+    Hidden = 64,
+    Close = 512,
+    ReduceOnly = 1024,
+    PostOnly = 4096,
+    Oco = 16384,
+    NoVarRates = 524288
 }

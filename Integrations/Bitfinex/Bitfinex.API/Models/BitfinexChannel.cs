@@ -1,11 +1,10 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
-namespace Bitfinex.API.Models
+namespace Bitfinex.API.Models;
+
+public static class BitfinexChannel
 {
-    public static class BitfinexChannel
-    {
-        public const string TICKER = "ticker";
-        public const string TRADES = "trades";
-        public const string BOOK = "book";
-    }
+    public const string TICKER = "ticker";
+    public const string TRADES = "trades";
+    public const string BOOK = "book";
 }
