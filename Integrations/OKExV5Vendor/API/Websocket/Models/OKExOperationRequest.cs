@@ -1,17 +1,16 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using Newtonsoft.Json;
 using System.Reflection;
 
-namespace OKExV5Vendor.API.Websocket.Models
-{
-    [Obfuscation(Exclude = true)]
-    class OKExOperationRequest<T>
-    {
-        [JsonProperty("op")]
-        public string Op { get; set; }
+namespace OKExV5Vendor.API.Websocket.Models;
 
-        [JsonProperty("args")]
-        public T[] Args { get; set; }
-    }
+[Obfuscation(Exclude = true)]
+class OKExOperationRequest<T>
+{
+    [JsonProperty("op")]
+    public string Op { get; set; }
+
+    [JsonProperty("args")]
+    public T[] Args { get; set; }
 }

@@ -1,16 +1,14 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
-using OKExV5Vendor.API;
 using OKExV5Vendor.API.REST.Models;
 using System.Collections.Generic;
 
-namespace OKExV5Vendor.API.SymbolsCache
+namespace OKExV5Vendor.API.SymbolsCache;
+
+interface IOKExSymbolsProvider
 {
-    interface IOKExSymbolsProvider
-    {
-        IEnumerable<OKExSymbol> GetSymbols(params OKExInstrumentType[] types);
-        bool TryGetFuturesByUnderlier(string underlierId, out IList<OKExSymbol> futures);
-        bool TryGetOptionsByUnderlier(string underlierId, out IList<OKExSymbol> options);
-        bool TryGetSymbolById(string symbolId, OKExInstrumentType type, out OKExSymbol symbol);
-    }
+    IEnumerable<OKExSymbol> GetSymbols(params OKExInstrumentType[] types);
+    bool TryGetFuturesByUnderlier(string underlierId, out IList<OKExSymbol> futures);
+    bool TryGetOptionsByUnderlier(string underlierId, out IList<OKExSymbol> options);
+    bool TryGetSymbolById(string symbolId, OKExInstrumentType type, out OKExSymbol symbol);
 }

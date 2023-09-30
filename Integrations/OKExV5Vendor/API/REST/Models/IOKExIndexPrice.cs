@@ -1,15 +1,12 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace OKExV5Vendor.API.REST.Models
+namespace OKExV5Vendor.API.REST.Models;
+
+internal interface IOKExIndexPrice
 {
-    interface IOKExIndexPrice
-    {
-        public double? IndexPrice { get; }
+    public double? IndexPrice { get; }
 
-        public DateTime Time { get; }
-    }
+    public DateTime Time { get; }
 }

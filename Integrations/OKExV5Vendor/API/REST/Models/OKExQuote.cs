@@ -1,26 +1,25 @@
-﻿// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 
-namespace OKExV5Vendor.API.REST.Models
+namespace OKExV5Vendor.API.REST.Models;
+
+internal class OKExQuote : IOKExQuote
 {
-    internal class OKExQuote : IOKExQuote
+    public double? AskPrice { get; }
+    public double? AskSize { get; }
+    public double? BidPrice { get; }
+    public double? BidSize { get; }
+    public DateTime Time { get; }
+
+    public OKExQuote(OKExOrderBookItem bid, OKExOrderBookItem ask, DateTime time)
     {
-        public double? AskPrice { get; }
-        public double? AskSize { get; }
-        public double? BidPrice { get; }
-        public double? BidSize { get; }
-        public DateTime Time { get; }
+        this.AskPrice = ask.Price;
+        this.AskSize = ask.Size;
 
-        public OKExQuote(OKExOrderBookItem bid, OKExOrderBookItem ask, DateTime time)
-        {
-            this.AskPrice = ask.Price;
-            this.AskSize = ask.Size;
+        this.BidPrice = bid.Price;
+        this.BidSize = bid.Size;
 
-            this.BidPrice = bid.Price;
-            this.BidSize = bid.Size;
-
-            this.Time = time;
-        }
+        this.Time = time;
     }
 }

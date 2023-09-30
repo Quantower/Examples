@@ -1,18 +1,16 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using OKExV5Vendor.API.REST.Models;
 using OKExV5Vendor.API.Websocket.Models;
 using System.Collections.Generic;
 
-namespace OKExV5Vendor.API.Misc
-{
-    interface IOKExOrderEntryDataProvider
-    {
-        IReadOnlyDictionary<string, OKExBalanceItem> Balances { get; }
-        OKExBalance TotalInfo { get; }
-        OKExAccount Account { get; }
+namespace OKExV5Vendor.API.Misc;
 
-        OKExSymbol GetSymbol(string id);
-        void PopulateLeverage(OKExSymbol symbol);
-    }
+internal interface IOKExOrderEntryDataProvider
+{
+    IReadOnlyDictionary<string, OKExBalanceItem> Balances { get; }
+    OKExBalance TotalInfo { get; }
+    OKExAccount Account { get; }
+
+    OKExSymbol GetSymbol(string id);
 }

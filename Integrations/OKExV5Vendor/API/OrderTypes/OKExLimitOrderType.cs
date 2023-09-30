@@ -1,39 +1,39 @@
-// Copyright QUANTOWER LLC. � 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System.Collections.Generic;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 
-namespace OKExV5Vendor.API.OrderTypes
+namespace OKExV5Vendor.API.OrderTypes;
+
+internal class OKExLimitOrderType : LimitOrderType
 {
-    class OKExLimitOrderType : LimitOrderType
+    public OKExLimitOrderType(params TimeInForce[] allowedTimeInForce)
+        : base(allowedTimeInForce)
     {
-        public OKExLimitOrderType(params TimeInForce[] allowedTimeInForce)
-            : base(allowedTimeInForce)
-        {
-        }
+    }
 
-        public override IList<SettingItem> GetOrderSettings(OrderRequestParameters parameters, FormatSettings formatSettings)
-        {
-            var settings = base.GetOrderSettings(parameters, formatSettings);
+    public override IList<SettingItem> GetOrderSettings(OrderRequestParameters parameters, FormatSettings formatSettings)
+    {
+        var settings = base.GetOrderSettings(parameters, formatSettings);
 
-            if (parameters.Type == RequestType.PlaceOrder)
+        if (parameters.Type == RequestType.PlaceOrder)
+        {
+            OKExOrderTypeHelper.AddTradeMode(parameters.Symbol, settings);
+
+            if (parameters.Symbol.SymbolType != SymbolType.Options)
             {
-                if (parameters.Symbol.SymbolType != SymbolType.Options)
-                {
-                    OKExOrderTypeHelper.AddTradeMode(parameters, settings);
-
-                    if (parameters.Symbol.SymbolType == SymbolType.Crypto)
-                        OKExOrderTypeHelper.AddReduceOnly(settings);
-                    else
-                        OKExOrderTypeHelper.AddOrderBehaviour(settings);
-                }
+                if (parameters.Symbol.SymbolType == SymbolType.Crypto)
+                    OKExOrderTypeHelper.AddReduceOnly(settings);
+                else
+                    OKExOrderTypeHelper.AddOrderBehaviour(settings);
 
                 OKExOrderTypeHelper.AddComment(settings, string.Empty);
                 OKExOrderTypeHelper.AddPostOnly(settings);
-            }
 
-            return settings;
+            }
         }
+
+        return settings;
     }
 }

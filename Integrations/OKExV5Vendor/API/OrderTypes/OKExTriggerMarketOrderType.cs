@@ -1,20 +1,19 @@
-// Copyright QUANTOWER LLC. � 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using TradingPlatform.BusinessLayer;
 
-namespace OKExV5Vendor.API.OrderTypes
+namespace OKExV5Vendor.API.OrderTypes;
+
+internal class OKExTriggerMarketOrderType : StopOrderType
 {
-    class OKExTriggerMarketOrderType : StopOrderType
+    public const string ID = "Trigger";
+
+    public override string Id => ID;
+    public override string Name => ID;
+
+    public OKExTriggerMarketOrderType(params TimeInForce[] allowedTimeInForce)
+        : base(allowedTimeInForce)
     {
-        public const string ID = "Trigger";
 
-        public override string Id => ID;
-        public override string Name => ID;
-
-        public OKExTriggerMarketOrderType(params TimeInForce[] allowedTimeInForce)
-            : base(allowedTimeInForce)
-        {
-            
-        }
     }
 }

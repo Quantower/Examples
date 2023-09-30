@@ -1,21 +1,20 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using Newtonsoft.Json;
 
-namespace OKExV5Vendor.API.REST.Models
+namespace OKExV5Vendor.API.REST.Models;
+
+internal class OKExCancelAlgoOrderRequest
 {
-    class OKExCancelAlgoOrderRequest
+    [JsonProperty("algoId")]
+    public string AlgoOrderId { get; set; }
+
+    [JsonProperty("instId")]
+    public string InstrumentId { get; set; }
+
+    public OKExCancelAlgoOrderRequest(OKExSymbol oKExSymbol, string algoOrderId)
     {
-        [JsonProperty("algoId")]
-        public string AlgoOrderId { get; set; }
-
-        [JsonProperty("instId")]
-        public string InstrumentId { get; set; }
-
-        public OKExCancelAlgoOrderRequest(OKExSymbol oKExSymbol, string algoOrderId)
-        {
-            this.InstrumentId = oKExSymbol.OKExInstrumentId;
-            this.AlgoOrderId = algoOrderId;
-        }
+        this.InstrumentId = oKExSymbol.OKExInstrumentId;
+        this.AlgoOrderId = algoOrderId;
     }
 }

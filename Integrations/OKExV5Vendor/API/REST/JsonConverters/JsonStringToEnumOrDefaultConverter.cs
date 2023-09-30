@@ -1,26 +1,24 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
 
-namespace OKExV5Vendor.API.REST.JsonConverters
+namespace OKExV5Vendor.API.REST.JsonConverters;
+
+public class JsonStringToEnumOrDefaultConverter : StringEnumConverter
 {
-    public class JsonStringToEnumOrDefaultConverter : StringEnumConverter
+    public override bool CanConvert(Type objectType) => true;
+
+    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
     {
-        public override bool CanConvert(Type objectType) => true;
+        string str = reader.Value.ToString();
 
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            string str = reader.Value.ToString();
-
-            if (!string.IsNullOrEmpty(str))
-                return base.ReadJson(reader, objectType, existingValue, serializer);
-            else
-                return existingValue;
-        }
-
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) { }
+        if (!string.IsNullOrEmpty(str))
+            return base.ReadJson(reader, objectType, existingValue, serializer);
+        else
+            return existingValue;
     }
 
+    public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer) { }
 }

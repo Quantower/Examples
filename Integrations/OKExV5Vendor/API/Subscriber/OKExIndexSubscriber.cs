@@ -1,36 +1,34 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using OKExV5Vendor.API.REST.Models;
 
-namespace OKExV5Vendor.API.Subscriber
+namespace OKExV5Vendor.API.Subscriber;
+
+class OKExIndexSubscriber : OKExSubscriberBase<OKExIndexTicker>
 {
-    class OKExIndexSubscriber : OKExSubscriberBase<OKExIndexTicker>
+    public OKExIndexSubscriber(OKExSymbol symbol)
+        : base(symbol) { }
+
+    internal bool TryUpdateTicker(OKExIndexTicker ticker, out bool isIndexPriceChanged)
     {
-        public OKExIndexSubscriber(OKExSymbol symbol)
-            : base(symbol) { }
+        bool needUpdateDaybar;
 
-        internal bool TryUpdateTicker(OKExIndexTicker ticker, out bool isIndexPriceChanged)
+        if (this.LastTicker == null)
         {
-            bool needUpdateDaybar;
+            needUpdateDaybar = true;
+            isIndexPriceChanged = false;
+        }
+        else
+        {
+            isIndexPriceChanged = ticker.IndexPrice != this.LastTicker.IndexPrice;
 
-            if (this.LastTicker == null)
-            {
-                needUpdateDaybar = true;
-                isIndexPriceChanged = false;
-            }
-            else
-            {
-                isIndexPriceChanged = ticker.IndexPrice != this.LastTicker.IndexPrice;
-
-                needUpdateDaybar = ticker.OpenPrice24h != this.LastTicker.OpenPrice24h ||
-                                   ticker.HighPrice24h != this.LastTicker.HighPrice24h ||
-                                   ticker.LowPrice24h != this.LastTicker.LowPrice24h;
-            }
-
-            this.LastTicker = ticker;
-
-            return needUpdateDaybar;
+            needUpdateDaybar = ticker.OpenPrice24h != this.LastTicker.OpenPrice24h ||
+                               ticker.HighPrice24h != this.LastTicker.HighPrice24h ||
+                               ticker.LowPrice24h != this.LastTicker.LowPrice24h;
         }
 
+        this.LastTicker = ticker;
+
+        return needUpdateDaybar;
     }
 }

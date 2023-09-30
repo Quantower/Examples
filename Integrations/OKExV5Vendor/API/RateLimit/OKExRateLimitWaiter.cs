@@ -1,56 +1,51 @@
-// Copyright QUANTOWER LLC. � 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using TradingPlatform.BusinessLayer;
 
-namespace OKExV5Vendor.API.RateLimit
+namespace OKExV5Vendor.API.RateLimit;
+
+internal class OKExRateLimitWaiter
 {
-    class OKExRateLimitWaiter
+    private readonly int requestCount;
+    private readonly TimeSpan perTime;
+    private readonly string uniqueId;
+
+    private readonly double delayBetweenRequestsMs;
+
+    private DateTime lastRequestTime;
+    private readonly object lockObject = new();
+
+    public OKExRateLimitWaiter(int requestCount, TimeSpan perTime, string uniqueId = null)
     {
-        private readonly int requestCount;
-        private readonly TimeSpan perTime;
+        this.requestCount = requestCount;
+        this.perTime = perTime;
+        this.uniqueId = uniqueId;
 
-        private int currentCount;
-        private DateTime lastResetTime;
+        this.delayBetweenRequestsMs = perTime.TotalMilliseconds / requestCount;
+    }
 
-        private readonly object lockObject = new object();
-
-        public OKExRateLimitWaiter(int requestCount, TimeSpan perTime)
+    public void WaitMyTurn(CancellationToken token)
+    {
+        lock (this.lockObject)
         {
-            this.requestCount = requestCount;
-            this.perTime = perTime;
-        }
+#warning Не впевнений, що це хороша реалізація, але кращого поки що не придумав.
 
-        public void WaitMyTurn()
-        {
-            lock (this.lockObject)
+            var now = Core.Instance.TimeUtils.DateTimeUtcNow;
+            var delta = now - this.lastRequestTime;
+
+            if (delta.TotalMilliseconds < this.delayBetweenRequestsMs)
             {
-                var now = Core.Instance.TimeUtils.DateTimeUtcNow;
-
-                if (this.currentCount > this.requestCount)
-                {
-                    var deltaTime = now - this.lastResetTime;
-
-                    if (deltaTime < this.perTime)
-                        Thread.Sleep(this.perTime - deltaTime);
-
-                    this.currentCount = 0;
-                    this.lastResetTime = now;
-                }
-                else
-                {
-                    var deltaTime = now - this.lastResetTime;
-
-                    if (deltaTime > this.perTime)
-                    {
-                        this.currentCount = 0;
-                        this.lastResetTime = now;
-                    }
-                }
-
-                this.currentCount++;
+                Task.Delay((int)this.delayBetweenRequestsMs, token).Wait(token);
+                now = Core.Instance.TimeUtils.DateTimeUtcNow;
             }
+
+            this.lastRequestTime = now;
+
+            //if (this.uniqueId != null)
+            //    System.Diagnostics.Trace.WriteLine($"[{now:O}] - ID: {this.uniqueId}\t Delay, ms: {this.delayBetweenRequestsMs}");
         }
     }
 }

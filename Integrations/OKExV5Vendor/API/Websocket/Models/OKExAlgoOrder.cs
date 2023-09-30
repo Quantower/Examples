@@ -1,106 +1,105 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using Newtonsoft.Json;
 using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.REST.JsonConverters;
 using OKExV5Vendor.API.REST.Models;
-using System.Reflection;
 using System;
+using System.Reflection;
 
-namespace OKExV5Vendor.API.Websocket.Models
+namespace OKExV5Vendor.API.Websocket.Models;
+
+[Obfuscation(Exclude = true)]
+class OKExAlgoOrder : OKExSymbolBasedObject, IPaginationLoadingItem
 {
-    [Obfuscation(Exclude = true)]
-    class OKExAlgoOrder : OKExSymbolBasedObject, IPaginationLoadingItem
-    {
-        internal const int MARKET_PRICE_INDICATOR = -1;
+    internal const int MARKET_PRICE_INDICATOR = -1;
 
-        [JsonProperty("instType")]
-        public override OKExInstrumentType InstrumentType { get; set; }
+    [JsonProperty("instType")]
+    public override OKExInstrumentType InstrumentType { get; set; }
 
-        [JsonProperty("instId")]
-        public override string OKExInstrumentId { get; set; }
+    [JsonProperty("instId")]
+    public override string OKExInstrumentId { get; set; }
 
-        [JsonProperty("ccy")]
-        public string MarginCurrency { get; set; }
+    [JsonProperty("ccy")]
+    public string MarginCurrency { get; set; }
 
-        [JsonProperty("ordId")]
-        public string OrderId { get; set; }
+    [JsonProperty("ordId")]
+    public string OrderId { get; set; }
 
-        [JsonProperty("algoId")]
-        public string AlgoOrderId { get; set; }
+    [JsonProperty("algoId")]
+    public string AlgoOrderId { get; set; }
 
-        [JsonProperty("sz", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? Size { get; set; }
+    [JsonProperty("sz", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? Size { get; set; }
 
-        [JsonProperty("ordType", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
-        public OKExAlgoOrderType AlgoOrderType { get; set; }
+    [JsonProperty("ordType", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
+    public OKExAlgoOrderType AlgoOrderType { get; set; }
 
-        [JsonProperty("side", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
-        public OKExSide Side { get; set; }
+    [JsonProperty("side", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
+    public OKExSide Side { get; set; }
 
-        [JsonProperty("posSide", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
-        public OKExPositionSide? PositionSide { get; set; }
+    [JsonProperty("posSide", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
+    public OKExPositionSide? PositionSide { get; set; }
 
-        [JsonProperty("tdMode", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
-        public OKExTradeMode TradeMode { get; set; }
+    [JsonProperty("tdMode", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
+    public OKExTradeMode TradeMode { get; set; }
 
-        [JsonProperty("state", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
-        public OKExAlgoOrderState? State { get; set; }
+    [JsonProperty("state", ItemConverterType = typeof(JsonStringToEnumOrDefaultConverter))]
+    public OKExAlgoOrderState? State { get; set; }
 
-        [JsonProperty("lever", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? Leverage { get; set; }
+    [JsonProperty("lever", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? Leverage { get; set; }
 
-        [JsonProperty("tpTriggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? TakeProfitTriggerPrice { get; set; }
+    [JsonProperty("tpTriggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? TakeProfitTriggerPrice { get; set; }
 
-        [JsonProperty("tpOrdPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? TakeProfitPrice { get; set; }
+    [JsonProperty("tpOrdPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? TakeProfitPrice { get; set; }
 
-        [JsonProperty("slTriggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? StopLossTriggerPrice { get; set; }
+    [JsonProperty("slTriggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? StopLossTriggerPrice { get; set; }
 
-        [JsonProperty("slOrdPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? StopLossPrice { get; set; }
+    [JsonProperty("slOrdPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? StopLossPrice { get; set; }
 
-        [JsonProperty("triggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? TriggerPrice { get; set; }
+    [JsonProperty("triggerPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? TriggerPrice { get; set; }
 
-        [JsonProperty("ordPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? Price { get; set; }
+    [JsonProperty("ordPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? Price { get; set; }
 
-        [JsonProperty("actualSz", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? ActualSize { get; set; }
+    [JsonProperty("actualSz", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? ActualSize { get; set; }
 
-        [JsonProperty("actualPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
-        public double? ActualPrice { get; set; }
+    [JsonProperty("actualPx", ItemConverterType = typeof(JsonStringToDoubleOrDefaultConverter))]
+    public double? ActualPrice { get; set; }
 
-        [JsonProperty("actualSide")]
-        public string ActualSide { get; set; }
+    [JsonProperty("actualSide")]
+    public string ActualSide { get; set; }
 
-        [JsonConverter(typeof(JsonStringToLongOrDefaultConverter))]
-        [JsonProperty("triggerTime")]
-        internal long? _triggerTime;
-        public DateTime TriggerTime => this._triggerTime.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._triggerTime.Value).UtcDateTime : default;
+    [JsonConverter(typeof(JsonStringToLongOrDefaultConverter))]
+    [JsonProperty("triggerTime")]
+    internal long? _triggerTime;
+    public DateTime TriggerTime => this._triggerTime.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._triggerTime.Value).UtcDateTime : default;
 
-        [JsonConverter(typeof(JsonStringToLongOrDefaultConverter))]
-        [JsonProperty("cTime")]
-        internal long? _cTime;
-        public DateTime CreationTime => this._cTime.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._cTime.Value).UtcDateTime : default;
+    [JsonConverter(typeof(JsonStringToLongOrDefaultConverter))]
+    [JsonProperty("cTime")]
+    internal long? _cTime;
+    public DateTime CreationTime => this._cTime.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(this._cTime.Value).UtcDateTime : default;
 
-        public bool HasStopLossPrice => this.StopLossPrice.HasValue && this.StopLossPrice != MARKET_PRICE_INDICATOR && this.StopLossPrice != 0;
-        public bool HasTakeProfitPrice => this.TakeProfitPrice.HasValue && this.TakeProfitPrice != MARKET_PRICE_INDICATOR && this.TakeProfitPrice != 0;
-        public bool HasStopLossTriggerPrice => this.StopLossTriggerPrice.HasValue && this.StopLossTriggerPrice != 0;
-        public bool HasTakeProfitTriggerPrice => this.TakeProfitTriggerPrice.HasValue && this.TakeProfitTriggerPrice != 0;
+    public bool HasStopLossPrice => this.StopLossPrice.HasValue && this.StopLossPrice != MARKET_PRICE_INDICATOR && this.StopLossPrice != 0;
+    public bool HasTakeProfitPrice => this.TakeProfitPrice.HasValue && this.TakeProfitPrice != MARKET_PRICE_INDICATOR && this.TakeProfitPrice != 0;
+    public bool HasStopLossTriggerPrice => this.StopLossTriggerPrice.HasValue && this.StopLossTriggerPrice != 0;
+    public bool HasTakeProfitTriggerPrice => this.TakeProfitTriggerPrice.HasValue && this.TakeProfitTriggerPrice != 0;
 
-        public bool HasPrice => this.Price.HasValue && this.Price != MARKET_PRICE_INDICATOR && this.Price != default;
+    public bool HasPrice => this.Price.HasValue && this.Price != MARKET_PRICE_INDICATOR && this.Price != default;
 
-        public bool IsCancelling { get; internal set; }
+    public bool IsCancelling { get; internal set; }
 
-        #region IPaginationLoadingItem
+    #region IPaginationLoadingItem
 
-        string IPaginationLoadingItem.AfterId => this.AlgoOrderId;
-        DateTime IPaginationLoadingItem.Time => this.CreationTime;
+    string IPaginationLoadingItem.AfterId => this.AlgoOrderId;
+    DateTime IPaginationLoadingItem.Time => this.CreationTime;
 
-        #endregion IPaginationLoadingItem
-    }
+    #endregion IPaginationLoadingItem
 }

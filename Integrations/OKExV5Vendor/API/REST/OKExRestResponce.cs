@@ -1,18 +1,17 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. Â© 2017-2023. All rights reserved.
 
 using Newtonsoft.Json;
 
-namespace OKExV5Vendor.API.REST
+namespace OKExV5Vendor.API.REST;
+
+class OKExRestResponce<T>
 {
-    class OKExRestResponce<T>
-    {
-        [JsonProperty("code")]
-        public string Code { get; set; }
+    [JsonProperty("code")]
+    public string Code { get; set; }
 
-        [JsonProperty("msg")]
-        public string Message { get; set; }
+    [JsonProperty("msg")]
+    public string Message { get; set; }
 
-        [JsonProperty("data")]
-        public T Data { get; set; }
-    }
+    [JsonProperty("data")]
+    public T Data { get; set; }
 }
