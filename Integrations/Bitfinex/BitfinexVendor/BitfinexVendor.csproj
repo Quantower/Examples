@@ -34,6 +34,6 @@
     </None>
   </ItemGroup>
 
-  <Import Project="..\..\..\BusinessLayer\SertificateValidatorShared\SertificateValidatorShared.projitems" Label="Shared" />
+  
 
 </Project>
