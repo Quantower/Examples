@@ -1,6 +1,5 @@
 // Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
-using SertificateValidatorShared;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
@@ -23,14 +22,6 @@ public class HitBTCVendor : Vendor
     #region Properties
     private Vendor vendor;
     #endregion Properties
-
-    static HitBTCVendor()
-    {
-        SertificateValidator.CheckAssemblyCertificate(typeof(Core).Assembly.Location);
-        SertificateValidator.CheckAssemblyCertificate(typeof(HitBTCVendor).Assembly.Location);
-
-        AssembliesSameBuildValidator.CheckIsSameBuild(typeof(Core).Assembly, typeof(HitBTCVendor).Assembly);
-    }
 
     public HitBTCVendor()
     {

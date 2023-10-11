@@ -1,6 +1,5 @@
 // Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
-using SertificateValidatorShared;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
@@ -98,14 +97,6 @@ public class BitfinexVendor : Vendor
     private Vendor currentVendor;
 
     #endregion Properties
-
-    static BitfinexVendor()
-    {
-        SertificateValidator.CheckAssemblyCertificate(typeof(Core).Assembly.Location);
-        SertificateValidator.CheckAssemblyCertificate(typeof(BitfinexVendor).Assembly.Location);
-
-        AssembliesSameBuildValidator.CheckIsSameBuild(typeof(Core).Assembly, typeof(BitfinexVendor).Assembly);
-    }
 
     #region Connection
 

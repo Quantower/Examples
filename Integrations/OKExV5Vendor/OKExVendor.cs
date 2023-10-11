@@ -2,7 +2,6 @@
 
 using OKExV5Vendor.Market;
 using OKExV5Vendor.Trading;
-using SertificateValidatorShared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,14 +16,6 @@ namespace OKExV5Vendor;
 public class OKExVendor : Vendor
 {
     private Vendor currentVendor;
-
-    static OKExVendor()
-    {
-        SertificateValidator.CheckAssemblyCertificate(typeof(Core).Assembly.Location);
-        SertificateValidator.CheckAssemblyCertificate(typeof(OKExVendor).Assembly.Location);
-
-        AssembliesSameBuildValidator.CheckIsSameBuild(typeof(Core).Assembly, typeof(OKExVendor).Assembly);
-    }
 
     #region Integration details
 
