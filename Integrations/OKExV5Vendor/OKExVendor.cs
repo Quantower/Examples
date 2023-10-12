@@ -186,16 +186,6 @@ public class OKExVendor : Vendor
     {
         var result = this.currentVendor.GetRules(token);
 
-        // Free acess Sep 2023 + 3 months
-        if (DateTime.UtcNow < new DateTime(2023, 12, 1))
-        {
-            result.Add(new LicenceMessageRule()
-            {
-                Name = CoreLicenceKeys.ALL_IN_ONE_PACKAGE,
-                Value = true,
-            });
-        }
-
         return result;
     }
     public override IList<MessageAccount> GetAccounts(CancellationToken token) => this.currentVendor.GetAccounts(token);
