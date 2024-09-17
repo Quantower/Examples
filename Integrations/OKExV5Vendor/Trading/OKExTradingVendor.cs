@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using OKExV5Vendor.API;
 using OKExV5Vendor.API.Misc;
@@ -376,7 +376,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
 
             if (!string.IsNullOrEmpty(error))
             {
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
                 break;
             }
 
@@ -427,8 +427,8 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
             var request = new OKExPlaceOrderRequest(oKExSymbol, tradeMode, parameters.Side.ToOKEx(), parameters.ToOKExOrderType());
             this.FillGeneralPlaceRequestProperties(request, parameters, tradeMode, oKExSymbol.InstrumentType);
 
-            request.Tag = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.COMMENT) ?? parameters.Comment;
-            request.ClientOrderId = this.GenerateUniqueClientOrderId();
+            request.Tag = OKExConsts.BROKER_ID;
+            request.ClientOrderId = parameters.AdditionalParameters.GetVisibleValue<string>(OKExOrderTypeHelper.COMMENT) ?? parameters.Comment;
 
             if (parameters.OrderTypeId == OrderType.Market && parameters.Symbol.SymbolType == SymbolType.Options)
             {
@@ -506,9 +506,6 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
             result = TradingOperationResult.CreateError(parameters.RequestId, error);
         }
 
-        if (result.Status == TradingOperationResultStatus.Failure)
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
-
         return result;
     }
     public override TradingOperationResult ModifyOrder(ModifyOrderRequestParameters parameters)
@@ -550,9 +547,6 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         else
             result = TradingOperationResult.CreateError(parameters.RequestId, $"OKEx doesn't allow to modify '{parameters.OrderTypeId}' order.");
 
-        if (result.Status == TradingOperationResultStatus.Failure)
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
-
         return result;
     }
     public override TradingOperationResult CancelOrder(CancelOrderRequestParameters parameters)
@@ -589,9 +583,6 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
             else
                 result = TradingOperationResult.CreateError(parameters.RequestId, $"[{responce.Code}] {error} {responce.Message}");
         }
-
-        if (result.Status == TradingOperationResultStatus.Failure)
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
 
         return result;
     }
@@ -643,9 +634,6 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
                 result = TradingOperationResult.CreateError(parameters.RequestId, error);
             else if (!string.IsNullOrEmpty(responce?.InstrumentId))
                 result = TradingOperationResult.CreateSuccess(parameters.RequestId);
-
-            if (result.Status == TradingOperationResultStatus.Failure)
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
         }
 
         return result;
@@ -680,7 +668,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
 
             if (!string.IsNullOrEmpty(error))
             {
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
                 break;
             }
 
@@ -727,7 +715,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
 
                 if (!string.IsNullOrEmpty(error))
                 {
-                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                    this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
                     break;
                 }
 
@@ -904,7 +892,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         var historyOrders = this.client.GetHistoryAlgoOrders(okexSymbol, okexSymbol.InstrumentType, algoOrderType, algoOrderState, fromDateTime, toDateTime, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
 
         foreach (var o in historyOrders)
         {
@@ -986,7 +974,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         var historyOrders = this.client.GetHistoryOrders(okexSymbol, fromDateTime, toDateTime, null, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error ?? "History orders report: Unknown error"));
 
         foreach (var o in historyOrders)
         {
@@ -1050,7 +1038,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         var depositRecords = this.client.GetDepositHistory(fromDateTime, toDateTime, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History deposit report: Unknown error"));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error ?? "History deposit report: Unknown error"));
 
         foreach (var o in depositRecords)
         {
@@ -1105,7 +1093,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         var withdrawalRecords = this.client.GetWithdrawalHistory(fromDateTime, toDateTime, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error ?? "History withdrawal report: Unknown error"));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error ?? "History withdrawal report: Unknown error"));
 
         foreach (var o in withdrawalRecords)
         {
@@ -1308,7 +1296,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
         var leverageItem = this.client.SetLeverage(request, cts.Token, out var error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
         else
         {
             if (side != OKExPositionSide.Net && mode == OKExMarginMode.Cross)
@@ -1320,7 +1308,7 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
                 leverageCache[side] = leverageItem.Leverage.Value;
 
             this.PushMessage(this.CreateSymbolMessage(symbol, symbol.FundingRate));
-            this.PushMessage(DealTicketGenerator.CreateInfoDealTicket(si.Name, $"{si.Name} for '{symbol.UniqueInstrumentId}' has beed changed to '{leverageItem.Leverage}'"));
+            this.PushMessage(MessageDealTicket.CreateInfoDealTicket(si.Name, $"{si.Name} for '{symbol.UniqueInstrumentId}' has beed changed to '{leverageItem.Leverage}'"));
         }
     }
 
@@ -1717,9 +1705,17 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
             Status = order.State.ToTerminal(),
             OriginalStatus = order.State.GetEnumMember(),
             FilledQuantity = order.AccumulatedFillQty ?? default,
-            Comment = order.OrderTag ?? string.Empty,
             AverageFillPrice = order?.AverageFilledPrice ?? default,
         };
+
+        string comment;
+        if (order.ClientOrderId != null && order.ClientOrderId.StartsWith(OKExConsts.BROKER_ID))
+            comment = order.OrderTag;
+        else
+            comment = order.ClientOrderId;
+
+        if (!string.IsNullOrEmpty(comment))
+            message.Comment = comment;
 
         if (order.TakeProfitTriggerPrice.HasValue)
             message.TakeProfit = SlTpHolder.CreateTP(order.TakeProfitTriggerPrice.Value);
@@ -2032,25 +2028,6 @@ class OKExTradingVendor : OKExMarketVendor, IOKExOrderEntryDataProvider
             if (this.account.PositionMode == OKExPositionMode.LongShort)
                 request.PositionSide = request.Side.ToPositionSide();
         }
-    }
-    private string GenerateUniqueClientOrderId()
-    {
-        string clientId = (OKExConsts.BROKER_ID + Guid.NewGuid()).Replace("-", "");
-
-        if (clientId.Length > OKExConsts.MAX_CLIENT_ORDER_ID_LENGTH)
-            return clientId.Substring(0, OKExConsts.MAX_CLIENT_ORDER_ID_LENGTH);
-        else
-            return clientId;
-    }
-    private string FormatComment(string comment)
-    {
-        if (string.IsNullOrEmpty(comment))
-            return null;
-
-        if (comment.Length > OKExConsts.MAX_COMMENT_LENGHT)
-            return comment.Substring(0, OKExConsts.MAX_COMMENT_LENGHT);
-        else
-            return comment;
     }
 
     #endregion Misc

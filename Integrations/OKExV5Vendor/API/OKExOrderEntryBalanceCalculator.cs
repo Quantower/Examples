@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using OKExV5Vendor.API.Misc;
 using OKExV5Vendor.API.OrderTypes;
@@ -233,18 +233,12 @@ internal class OKExOrderEntryBalanceCalculator : RegularBalanceCalculator
             if (this.IsSpotSymbol)
             {
                 if (this.TotalAsset == this.BalanceAsset)
-                    this.UpdateQuantity(availableBalance);
+                    this.UpdateTotal(availableBalance, SettingItemValueChangingReason.Manually);
                 else
-                    this.UpdateTotal(availableBalance);
+                    this.UpdateQuantity(availableBalance, SettingItemValueChangingReason.Manually);
             }
             else if (this.IsContractBasedSymbol)
-            {
-                var coinsPerContract = this.okexSymbol.ContractType == OKExContractType.Linear
-                    ? this.okexSymbol.ContractValue.Value * this.CurrentSymbol.Last
-                    : this.okexSymbol.ContractValue.Value / this.CurrentSymbol.Last;
-
-                this.UpdateQuantity((int)(availableBalance / coinsPerContract) * coinsPerContract);
-            }
+                this.UpdateTotal(availableBalance, SettingItemValueChangingReason.Manually);
         }
     }
     protected override void OnSideChanged()

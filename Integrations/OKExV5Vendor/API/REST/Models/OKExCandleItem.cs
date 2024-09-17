@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using Newtonsoft.Json;
 using OKExV5Vendor.API.Misc;
@@ -19,6 +19,7 @@ internal class OKExCandleItem : IPaginationLoadingItem
 
     public double? Volume { get; set; }
     public double? CurrencyVolume { get; set; }
+    public double? QuoteCurrencyVolume { get; set; }
 
     public string AfterId => null;
 }

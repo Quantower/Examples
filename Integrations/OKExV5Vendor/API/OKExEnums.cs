@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -62,6 +62,12 @@ internal enum OKExFutureAliasType
     [Description("Next week")]
     [EnumMember(Value = "next_week")]
     NextWeek,
+    [Description("This month")]
+    [EnumMember(Value = "this_month")]
+    ThisMonth,
+    [Description("Next month")]
+    [EnumMember(Value = "next_month")]
+    NextMonth,
     [Description("Quarter")]
     [EnumMember(Value = "quarter")]
     Quarter,

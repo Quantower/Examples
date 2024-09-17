@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using OKExV5Vendor.API;
 using OKExV5Vendor.API.OrderTypes;
@@ -79,7 +79,7 @@ class OKExMarketVendor : Vendor
     }
     public override PingResult Ping()
     {
-       return new PingResult()
+        return new PingResult()
         {
             State = this.client.IsConnected ? PingEnum.Connected : PingEnum.Disconnected,
             PingTime = this.client.Ping
@@ -217,173 +217,130 @@ class OKExMarketVendor : Vendor
 
     #region History
 
-    public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken)
+    public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken) => new HistoryMetadata()
     {
-        return new HistoryMetadata()
+        AllowedAggregations = new string[]
         {
-            AllowedHistoryTypes = new HistoryType[] { HistoryType.Last, HistoryType.Mark },
-            AllowedPeriods = OKExConsts.AllowedPeriods,
-            DownloadingStep_Tick = TimeSpan.FromHours(1),
-            DownloadingStep_Minute = TimeSpan.FromDays(1),
-        };
-    }
+            HistoryAggregation.TICK,
+            HistoryAggregation.TIME,
+        },
+        AllowedPeriodsHistoryAggregationTime = OKExConsts.AllowedPeriods,
+        AllowedHistoryTypesHistoryAggregationTick = new HistoryType[]
+        {
+            HistoryType.Last,
+            HistoryType.Mark
+        },
+        AllowedHistoryTypesHistoryAggregationTime = new HistoryType[]
+        {
+            HistoryType.Last,
+        },
+
+        DownloadingStep_Tick = TimeSpan.FromHours(1),
+        DownloadingStep_Minute = TimeSpan.FromDays(1),
+        BuildUncompletedBars = true,
+    };
+
     public override IList<IHistoryItem> LoadHistory(HistoryRequestParameters requestParameters)
     {
-        var result = new List<IHistoryItem>();
-
         if (!this.allSymbolsCache.TryGetValue(requestParameters.SymbolId, out var okexSymbol))
-            return result;
+            return new List<IHistoryItem>();
 
-        if (requestParameters.Period == Period.TICK1)
+        switch (requestParameters.Aggregation)
         {
-            var ticks = this.client.GetTickHistory(okexSymbol, requestParameters.FromTime, requestParameters.ToTime, requestParameters.CancellationToken, out string error);
-
-            if (!string.IsNullOrEmpty(error))
-            {
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
-                return result;
-            }
-
-            long prevTickTime = default;
-
-            for (int i = ticks.Length - 1; i >= 0; i--)
-            {
-                var tick = ticks[i];
-
-                if (tick.Time >= requestParameters.FromTime && tick.Time <= requestParameters.ToTime)
+            case HistoryAggregationTick:
                 {
-                    var item = new HistoryItemLast()
+                    var result = new List<IHistoryItem>();
+
+                    var ticks = this.client.GetTickHistory(okexSymbol, requestParameters.FromTime, requestParameters.ToTime, requestParameters.CancellationToken, out string error);
+
+                    if (!string.IsNullOrEmpty(error))
                     {
-                        Price = tick.Price ?? default,
-                        Volume = tick.Size ?? default,
-                        AggressorFlag = tick.Side.ToAggressorFlag(),
-                        TicksLeft = tick.Time.Ticks
-                    };
-
-                    if (prevTickTime >= item.TicksLeft)
-                        item.TicksLeft = prevTickTime + 1;
-
-                    prevTickTime = item.TicksLeft;
-                    result.Add(item);
-                }
-            }
-        }
-        else
-        {
-            var okexPeriod = requestParameters.Period.ToOKEx();
-            var historyType = requestParameters.HistoryType.ToOKEx();
-            var after = requestParameters.ToTime;
-            bool keepGoing = true;
-
-            while (keepGoing)
-            {
-                var candles = this.client.GetCandleHistory(okexSymbol, after, okexPeriod, historyType, requestParameters.CancellationToken, out string error);
-
-                if (!string.IsNullOrEmpty(error))
-                {
-                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
-                    break;
-                }
-
-                foreach (var item in candles)
-                {
-                    if (item.Time < requestParameters.FromTime)
-                    {
-                        keepGoing = false;
-                        break;
+                        this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
+                        return result;
                     }
 
-                    if (requestParameters.ToTime >= item.Time)
+                    long prevTickTime = default;
+
+                    for (int i = ticks.Length - 1; i >= 0; i--)
                     {
-                        result.Add(new HistoryItemBar()
+                        var tick = ticks[i];
+
+                        if (tick.Time >= requestParameters.FromTime && tick.Time <= requestParameters.ToTime)
                         {
-                            Close = item.Close,
-                            Open = item.Open,
-                            High = item.High,
-                            Low = item.Low,
-                            TicksLeft = item.Time.Ticks,
-                            Volume = (okexSymbol.IsInverseContractSymbol ? item.CurrencyVolume : item.Volume) ?? default
-                        });
+                            var item = new HistoryItemLast()
+                            {
+                                Price = tick.Price ?? default,
+                                Volume = tick.Size ?? default,
+                                AggressorFlag = tick.Side.ToAggressorFlag(),
+                                TicksLeft = tick.Time.Ticks
+                            };
+
+                            if (prevTickTime >= item.TicksLeft)
+                                item.TicksLeft = prevTickTime + 1;
+
+                            prevTickTime = item.TicksLeft;
+                            result.Add(item);
+                        }
                     }
 
-                    after = item.Time;
+                    return result;
                 }
 
-                if (keepGoing)
-                    keepGoing = candles.Length == 100;
-            }
-
-
-            //
-            //
-            //
-            long lastLoadedTimeTicks = requestParameters.FromTime.Ticks;
-            if (result.Count > 0)
-            {
-                // для месяца нужно считать по дням
-                if (requestParameters.Period.BasePeriod == BasePeriod.Month)
+            case HistoryAggregationTime historyAggregationTime:
                 {
-                    lastLoadedTimeTicks = result.First().TicksLeft;
+                    var result = new List<IHistoryItem>();
 
-                    for (int i = 0; i < requestParameters.Period.PeriodMultiplier; i++)
+                    var okexPeriod = historyAggregationTime.Period.ToOKEx();
+                    var historyType = historyAggregationTime.HistoryType.ToOKEx();
+                    var after = requestParameters.ToTime;
+                    bool keepGoing = true;
+
+                    while (keepGoing)
                     {
-                        var dateTime = new DateTime(lastLoadedTimeTicks + TimeSpan.TicksPerDay, DateTimeKind.Utc);
+                        var candles = this.client.GetCandleHistory(okexSymbol, after, okexPeriod, historyType, requestParameters.CancellationToken, out string error);
 
-                        int daysCount = DateTime.DaysInMonth(dateTime.Year, dateTime.Month);
+                        if (!string.IsNullOrEmpty(error))
+                        {
+                            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
+                            break;
+                        }
 
-                        lastLoadedTimeTicks += TimeSpan.TicksPerDay * daysCount;
+                        foreach (var item in candles)
+                        {
+                            if (item.Time < requestParameters.FromTime)
+                            {
+                                keepGoing = false;
+                                break;
+                            }
+
+                            if (requestParameters.ToTime >= item.Time)
+                            {
+                                result.Add(new HistoryItemBar()
+                                {
+                                    Close = item.Close,
+                                    Open = item.Open,
+                                    High = item.High,
+                                    Low = item.Low,
+                                    TicksLeft = item.Time.Ticks,
+                                    Volume = (okexSymbol.IsInverseContractSymbol ? item.CurrencyVolume : item.Volume) ?? default,
+                                    QuoteAssetVolume = (okexSymbol.InstrumentType == OKExInstrumentType.Spot || okexSymbol.InstrumentType == OKExInstrumentType.Margin ? item.CurrencyVolume : item.QuoteCurrencyVolume) ?? default,
+                                });
+                            }
+
+                            after = item.Time;
+                        }
+
+                        if (keepGoing)
+                            keepGoing = candles.Length == 100;
                     }
+
+                    result.Reverse();
+                    return result;
                 }
-                else
-                    lastLoadedTimeTicks = result.First().TicksLeft + requestParameters.Period.Ticks;
-            }
 
-            if (lastLoadedTimeTicks + requestParameters.Period.Ticks >= Core.Instance.TimeUtils.DateTimeUtcNow.Ticks)
-            {
-                var lastBar = this.LoadLastBar(requestParameters, lastLoadedTimeTicks);
-
-                if (lastBar != null)
-                    result.InsertRange(0, lastBar);
-            }
-
+            default:
+                return new List<IHistoryItem>();
         }
-
-        return result;
-    }
-
-    private IList<IHistoryItem> LoadLastBar(HistoryRequestParameters requestParameters, long lastLoadedTimeTicks)
-    {
-        // Костя: как так вышло не понятно
-        if (lastLoadedTimeTicks >= requestParameters.ToTime.Ticks)
-            return null;
-
-        if (requestParameters.Period.BasePeriod == BasePeriod.Tick)
-            return null;
-
-        var parametersCopy = requestParameters.Copy;
-        parametersCopy.Aggregation = new HistoryAggregationTime(requestParameters.Period);
-
-        if (requestParameters.Period <= Period.MIN1)
-            parametersCopy.Period = Period.TICK1;
-        else if (requestParameters.Period <= Period.HOUR1)
-            parametersCopy.Period = Period.MIN1;
-        else if (requestParameters.Period <= Period.DAY1)
-            parametersCopy.Period = Period.HOUR1;
-        else
-            parametersCopy.Period = Period.DAY1;
-
-        parametersCopy.FromTime = new DateTime(lastLoadedTimeTicks, DateTimeKind.Utc);
-
-        var baseHistory = this.LoadHistory(parametersCopy);
-
-        if (baseHistory == null || baseHistory.Count == 0)
-            return null;
-
-        var historyProcessor = Core.Instance.HistoryAggregations.CreateHistoryProcessor(parametersCopy);
-        baseHistory = baseHistory.Reverse().ToList();
-        var aggregatedHistory = historyProcessor.AggregateHistory(new HistoryHolder(baseHistory, parametersCopy));
-
-        return aggregatedHistory;
     }
 
     #endregion History
@@ -477,11 +434,22 @@ class OKExMarketVendor : Vendor
 
     private void Client_OnNewTrade(OKExSymbol symbol, OKExTradeItem trade)
     {
-        this.PushMessage(new Last(symbol.UniqueInstrumentId, trade.Price.Value, symbol.ConvertSizeToBaseCurrency(trade), trade.Time)
+        var size = symbol.ConvertSizeToBaseCurrency(trade);
+
+        var last = new Last(symbol.UniqueInstrumentId, trade.Price.Value, size, trade.Time)
         {
             AggressorFlag = trade.Side.ToAggressorFlag(),
             TradeId = trade.TradeId
-        });
+        };
+
+        if (symbol.ContractType == OKExContractType.Linear)
+            last.QuoteAssetVolume = size * trade.Price.Value * symbol.ContractValue.Value;
+        else if (symbol.ContractType == OKExContractType.Inverse)
+            last.QuoteAssetVolume = trade.Size.Value * symbol.ContractValue.Value;
+        else
+            last.QuoteAssetVolume = trade.Price.Value * size;
+
+        this.PushMessage(last);
     }
     private void Client_OnNewMark(OKExSymbol symbol, OKExMarkItem mark)
     {
@@ -527,6 +495,28 @@ class OKExMarketVendor : Vendor
 
         if (oi != null && oi.OpenInterestInCurrency.HasValue)
             daybar.OpenInterest = oi.OpenInterestInCurrency.Value;
+
+        switch (symbol.ContractType)
+        {
+            case OKExContractType.Linear:
+                {
+                    if (ticker.VolumeCurrency24h.HasValue && ticker.LastPrice.HasValue)
+                        daybar.QuoteAssetVolume = ticker.VolumeCurrency24h.Value * ticker.LastPrice.Value;
+                    break;
+                }
+            case OKExContractType.Inverse:
+                {
+                    if (ticker.Volume24h.HasValue)
+                        daybar.QuoteAssetVolume = ticker.Volume24h.Value * symbol.ContractValue.Value;
+                    break;
+                }
+            default:
+                {
+                    if (ticker.VolumeCurrency24h.HasValue)
+                        daybar.QuoteAssetVolume = ticker.VolumeCurrency24h.Value;
+                    break;
+                }
+        }
 
         this.PushMessage(daybar);
     }
@@ -592,7 +582,7 @@ class OKExMarketVendor : Vendor
     }
     private void Client_OnError(string message)
     {
-        this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(message));
+        this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(message));
     }
 
     #endregion Event handler

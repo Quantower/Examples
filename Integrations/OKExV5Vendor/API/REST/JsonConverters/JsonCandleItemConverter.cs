@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -31,6 +31,9 @@ public class JsonCandleItemConverter : JsonConverter
 
             if (jArray.Count > 6)
                 candle.CurrencyVolume = jArray[6].Value<double>();
+
+            if (jArray.Count > 7)
+                candle.QuoteCurrencyVolume = jArray[7].Value<double>();
 
             return candle;
         }

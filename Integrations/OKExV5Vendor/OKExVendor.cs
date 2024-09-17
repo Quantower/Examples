@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using OKExV5Vendor.Market;
 using OKExV5Vendor.Trading;
@@ -185,6 +185,7 @@ public class OKExVendor : Vendor
     public override IList<MessageRule> GetRules(CancellationToken token)
     {
         var result = this.currentVendor.GetRules(token);
+
 
         return result;
     }
