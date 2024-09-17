@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using Bitfinex.API.Models;
 using Bitfinex.API.Models.Requests;
@@ -228,7 +228,7 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
         this.Api.PublicWebSocketApi.Subscribe(channel, parameters.SymbolId, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
     }
 
     public override void UnSubscribeSymbol(SubscribeQuotesParameters parameters)
@@ -247,7 +247,7 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
         this.Api.PublicWebSocketApi.Unsubscribe(channel, parameters.SymbolId, parameters.CancellationToken, out string error);
 
         if (!string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
     }
 
     #endregion Subscriptions
@@ -256,11 +256,13 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
 
     public override HistoryMetadata GetHistoryMetadata(CancellationToken cancellation) => new()
     {
-        AllowedHistoryTypes = new[] { HistoryType.Last },
-        DownloadingStep_Tick = TimeSpan.FromDays(10),
-        AllowedPeriods = new[]
+        AllowedAggregations = new string[]
         {
-            Period.TICK1,
+            HistoryAggregation.TICK,
+            HistoryAggregation.TIME,
+        },
+        AllowedPeriodsHistoryAggregationTime = new[]
+        {
             Period.MIN1,
             Period.MIN5,
             Period.MIN15,
@@ -273,7 +275,16 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
             new(BasePeriod.Day, 7),
             new(BasePeriod.Day, 14),
             Period.MONTH1
-        }
+        },
+        AllowedHistoryTypesHistoryAggregationTime = new[]
+        {
+            HistoryType.Last
+        },
+        AllowedHistoryTypesHistoryAggregationTick = new[]
+        {
+            HistoryType.Last
+        },
+        DownloadingStep_Tick = TimeSpan.FromDays(10),
     };
 
     public override IList<IHistoryItem> LoadHistory(HistoryRequestParameters requestParameters)
@@ -288,62 +299,69 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
 
         var itemsStack = new Stack<List<IHistoryItem>>();
 
-        if (requestParameters.Period.BasePeriod == BasePeriod.Tick)
+        switch (requestParameters.Aggregation)
         {
-            long currentToUnix = toUnix;
+            case HistoryAggregationTick:
+                {
+                    long currentToUnix = toUnix;
 
-            while (fromUnix < currentToUnix)
-            {
-                var trades = this.HandleApiResponse(
-                    () => this.Api.PublicRestApiV2.GetTrades(symbol, fromUnix, currentToUnix, cancellation), cancellation, out string _, true, true);
+                    while (fromUnix < currentToUnix)
+                    {
+                        var trades = this.HandleApiResponse(
+                            () => this.Api.PublicRestApiV2.GetTrades(symbol, fromUnix, currentToUnix, cancellation), cancellation, out string _, true, true);
 
-                if (trades == null || trades.Length == 0)
-                    break;
+                        if (trades == null || trades.Length == 0)
+                            break;
 
-                var ticks = trades.Select(CreateHistoryItemLast).ToList();
+                        var ticks = trades.Select(CreateHistoryItemLast).ToList();
 
-                itemsStack.Push(ticks);
+                        itemsStack.Push(ticks);
 
-                currentToUnix = trades.Last().Timestamp - 1;
-            }
+                        currentToUnix = trades.Last().Timestamp - 1;
+                    }
+                }
+                break;
+
+            case HistoryAggregationTime historyAggregationTime:
+                {
+                    string timeFrame = historyAggregationTime.Period.Ticks switch
+                    {
+                        TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_1,
+                        5 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_5,
+                        15 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_15,
+                        30 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_30,
+                        TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_1,
+                        3 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_3,
+                        6 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_6,
+                        12 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_12,
+                        TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_1,
+                        7 * TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_7,
+                        14 * TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_14,
+                        _ => BitfinexTimeframe.MONTH_1
+                    }; ;
+                    long millisecondsInRequestPeriod = historyAggregationTime.Period.Ticks / TimeSpan.TicksPerMillisecond;
+                    long currentToUnix = toUnix;
+
+                    while (fromUnix < currentToUnix)
+                    {
+                        var candles = this.HandleApiResponse(
+                            () => this.Api.PublicRestApiV2.GetCandles(symbol, timeFrame, fromUnix, currentToUnix, cancellation), cancellation, out string _, true, true);
+
+                        if (candles == null || candles.Length == 0)
+                            break;
+
+                        var bars = candles.Select(CreateHistoryItemBar).ToList();
+
+                        itemsStack.Push(bars);
+
+                        currentToUnix = candles.Last().Timestamp - millisecondsInRequestPeriod;
+                    }
+                }
+                break;
+
+            default:
+                return result;
         }
-        else
-        {
-            string timeFrame = GetTimeFrameFromPeriod(requestParameters.Period);
-            long millisecondsInRequestPeriod = requestParameters.Period.Ticks / TimeSpan.TicksPerMillisecond;
-            long currentToUnix = toUnix;
-
-            while (fromUnix < currentToUnix)
-            {
-                var candles = this.HandleApiResponse(
-                    () => this.Api.PublicRestApiV2.GetCandles(symbol, timeFrame, fromUnix, currentToUnix, cancellation), cancellation, out string _, true, true);
-
-                if (candles == null || candles.Length == 0)
-                    break;
-
-                var bars = candles.Select(CreateHistoryItemBar).ToList();
-
-                itemsStack.Push(bars);
-
-                currentToUnix = candles.Last().Timestamp - millisecondsInRequestPeriod;
-            }
-        }
-
-        string GetTimeFrameFromPeriod(Period period) => period.Ticks switch
-        {
-            TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_1,
-            5 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_5,
-            15 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_15,
-            30 * TimeSpan.TicksPerMinute => BitfinexTimeframe.MINUTE_30,
-            TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_1,
-            3 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_3,
-            6 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_6,
-            12 * TimeSpan.TicksPerHour => BitfinexTimeframe.HOUR_12,
-            TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_1,
-            7 * TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_7,
-            14 * TimeSpan.TicksPerDay => BitfinexTimeframe.DAY_14,
-            _ => BitfinexTimeframe.MONTH_1
-        };
 
         while (itemsStack.Count > 0)
         {
@@ -712,7 +730,10 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
         double size = bitfinexBookItem.Count == 0 ? 0 : Math.Abs((double)bitfinexBookItem.Amount);
         var utcNow = Core.Instance.TimeUtils.DateTimeUtcNow;
 
-        return new Level2Quote(priceType, symbol, id, price, size, utcNow);
+        return new Level2Quote(priceType, symbol, id, price, size, utcNow)
+        {
+            Closed = size == 0d
+        };
     }
 
     private Last CreateLast(BitfinexTrade bitfinexTrade)
@@ -848,7 +869,7 @@ internal class BitfinexMarketDataVendor : BitfinexInternalVendor
         if (e.Exception == null)
             return;
 
-        this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(e.Exception.GetFullMessageRecursive()));
+        this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(e.Exception.GetFullMessageRecursive()));
     }
 
     private protected override void OnTimerTick()

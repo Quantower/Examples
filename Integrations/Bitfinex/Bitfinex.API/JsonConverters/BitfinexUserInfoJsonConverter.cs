@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System;
 using Bitfinex.API.Models;
@@ -13,14 +13,14 @@ internal class BitfinexUserInfoJsonConverter : JsonConverter<BitfinexUserInfo>
     {
         var jArray = serializer.Deserialize<JArray>(reader);
 
-        var result = new BitfinexUserInfo()
+        var result = new BitfinexUserInfo
         {
             Id = jArray[0].Value<int>(),
             Email = jArray[1].Value<string>(),
             Username = jArray[2].Value<string>(),
             CreationTime = DateTimeOffset.FromUnixTimeMilliseconds(jArray[3].Value<long>()).UtcDateTime,
             IsVerified = jArray[4].Value<int>() == 1,
-            VerificationLevel = jArray[5].Value<int>(),
+            VerificationLevel = jArray[5].Value<int?>() ?? 0,
             Timezone = jArray[7].Value<string>(),
             Locale = jArray[8].Value<string>(),
             Company = jArray[9].Value<string>(),

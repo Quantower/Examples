@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
@@ -195,9 +195,6 @@ public class BitfinexVendor : Vendor
     #region Volume analysis
 
     public override VolumeAnalysisMetadata GetVolumeAnalysisMetadata() => this.currentVendor.GetVolumeAnalysisMetadata();
-
-    public override VendorVolumeAnalysisResponse LoadVolumeAnalysis(VolumeAnalysisRequestParameters requestParameters)
-        => this.currentVendor.LoadVolumeAnalysis(requestParameters);
 
     public override VendorVolumeAnalysisByPeriodResponse LoadVolumeAnalysis(VolumeAnalysisByPeriodRequestParameters requestParameters)
         => this.currentVendor.LoadVolumeAnalysis(requestParameters);

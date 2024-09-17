@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using Bitfinex.API;
 using Bitfinex.API.Models;
@@ -119,12 +119,15 @@ internal class BitfinexTradingVendor : BitfinexMarketDataVendor
         if (!string.IsNullOrEmpty(error))
             throw new InvalidOperationException(error);
 
-        // Account summary
-        this.Context.AccountSummary = this.HandleApiResponse(
-            () => this.Api.PrivateRestApiV2.GetAccountSummary(token), token, out error);
+        if (this.Context.UserInfo.IsVerified)
+        {
+            // Account summary
+            this.Context.AccountSummary = this.HandleApiResponse(
+                () => this.Api.PrivateRestApiV2.GetAccountSummary(token), token, out error);
 
-        if (!string.IsNullOrEmpty(error))
-            throw new InvalidOperationException(error);
+            if (!string.IsNullOrEmpty(error))
+                throw new InvalidOperationException(error);
+        }
 
         return new List<MessageAccount>
         {
@@ -384,11 +387,6 @@ internal class BitfinexTradingVendor : BitfinexMarketDataVendor
         catch (Exception ex)
         {
             return result = TradingOperationResult.CreateError(requestId, ex.GetFullMessageRecursive());
-        }
-        finally
-        {
-            if (result is { Status: TradingOperationResultStatus.Failure })
-                this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(result.Message));
         }
     }
 
@@ -1152,10 +1150,7 @@ internal class BitfinexTradingVendor : BitfinexMarketDataVendor
             var orderHistory = this.CreateOrderHistory(e.OrderUpdate);
 
             if (orderHistory.OrderTypeId != OrderType.TrailingStop)
-            {
                 this.PushMessage(orderHistory);
-                this.PushMessage(DealTicketGenerator.CreateTradingDealTicket(orderHistory));
-            }
 
             if (orderHistory.Status is OrderStatus.Cancelled or OrderStatus.Filled || orderHistory.FilledQuantity == orderHistory.TotalQuantity)
                 this.PushMessage(this.CreateCloseOrder(e.OrderUpdate));
@@ -1181,7 +1176,7 @@ internal class BitfinexTradingVendor : BitfinexMarketDataVendor
             if (!notificationsMap.TryGetValue(e.Notification.Type, out string header))
                 header = e.Notification.Type;
 
-            this.PushMessage(DealTicketGenerator.CreateInfoDealTicket(header, e.Notification.Text));
+            this.PushMessage(MessageDealTicket.CreateInfoDealTicket(header, e.Notification.Text));
         }
     }
 

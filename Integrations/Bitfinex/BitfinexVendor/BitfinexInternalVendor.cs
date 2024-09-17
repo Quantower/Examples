@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System;
 using System.Diagnostics;
@@ -173,7 +173,7 @@ internal class BitfinexInternalVendor : Vendor
 
                 if (notify && !string.IsNullOrEmpty(error))
                 {
-                    this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+                    this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
                     notify = false;
                 }
 
@@ -200,7 +200,7 @@ internal class BitfinexInternalVendor : Vendor
         }
 
         if (notify && !string.IsNullOrEmpty(error))
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(error));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(error));
 
         return default;
     }
