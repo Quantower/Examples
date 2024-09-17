@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using HitBTC.Net;
 using HitBTC.Net.Communication;
@@ -248,11 +248,13 @@ internal class MarketDataVendor : Vendor
     #region History
     public override HistoryMetadata GetHistoryMetadata(CancellationToken cancelationToken) => new HistoryMetadata()
     {
-        AllowedHistoryTypes = new HistoryType[] { HistoryType.Last },
-        DownloadingStep_Tick = TimeSpan.FromDays(1),
-        AllowedPeriods = new Period[]
+        AllowedAggregations = new string[]
         {
-            Period.TICK1,
+            HistoryAggregation.TICK,
+            HistoryAggregation.TIME,
+        },
+        AllowedPeriodsHistoryAggregationTime = new Period[]
+        {
             Period.MIN1,
             Period.MIN3,
             Period.MIN5,
@@ -263,88 +265,109 @@ internal class MarketDataVendor : Vendor
             Period.DAY1,
             new Period(BasePeriod.Day, 7),
             Period.MONTH1
-        }
+        },
+        AllowedHistoryTypesHistoryAggregationTime = new HistoryType[]
+        {
+            HistoryType.Last
+        },
+        AllowedHistoryTypesHistoryAggregationTick = new HistoryType[]
+        {
+            HistoryType.Last
+        },
+
+        DownloadingStep_Tick = TimeSpan.FromDays(1),
     };
 
     public override IList<IHistoryItem> LoadHistory(HistoryRequestParameters requestParameters)
     {
-        List<IHistoryItem> result = new List<IHistoryItem>();
-
         string symbol = requestParameters.Symbol.Id;
         DateTime from = requestParameters.FromTime;
         DateTime to = requestParameters.ToTime;
         var token = requestParameters.CancellationToken;
 
-        if (requestParameters.Period.BasePeriod == BasePeriod.Tick)
+        switch (requestParameters.Aggregation)
         {
-            List<HitTrade> hitTrades = new List<HitTrade>();
-
-            while (from < to)
-            {
-                var trades = this.CheckHitResponse(this.restApi.GetTradesByTimestampAsync(symbol, HitSort.Asc, from, to, MAX_TRADES_BY_REQUEST, cancellationToken: token).Result, out HitError hitError, true);
-
-                if (hitError != null || token.IsCancellationRequested)
-                    break;
-
-                hitTrades.AddRange(trades);
-
-                if (trades.Length < MAX_TRADES_BY_REQUEST)
-                    break;
-
-                from = trades.Last().Timestamp;
-            }
-
-            long prevTimeTicks = 0;
-            long prevTradeId = 0;
-            foreach (var hitTrade in hitTrades)
-            {
-                if (token.IsCancellationRequested)
-                    break;
-
-                if (hitTrade.Id <= prevTradeId)
-                    continue;
-
-                prevTradeId = hitTrade.Id;
-
-                var last = this.CreateHistoryItem(hitTrade);
-
-                if (last.TicksLeft <= prevTimeTicks)
-                    last.TicksLeft = prevTimeTicks + 1;
-
-                prevTimeTicks = last.TicksLeft;
-
-                result.Add(last);
-            }
-        }
-        else
-        {
-            var hitPeriod = this.ConvertPeriod(requestParameters.Period);
-
-            var intervals = requestParameters.Interval.Split(TimeSpan.FromTicks(requestParameters.Period.Ticks * MAX_TRADES_BY_REQUEST));
-
-            foreach (var interval in intervals)
-            {
-                var candles = this.CheckHitResponse(this.restApi.GetCandlesAsync(symbol, interval.From, interval.To, hitPeriod, MAX_TRADES_BY_REQUEST, token).Result, out _, true);
-
-                if (candles == null)
-                    return null;
-
-                foreach (var candle in candles)
+            case HistoryAggregationTick:
                 {
-                    if (token.IsCancellationRequested)
-                        break;
+                    var result = new List<IHistoryItem>();
 
-                    if (candle.Timestamp < from || candle.Timestamp > to)
-                        continue;
+                    var hitTrades = new List<HitTrade>();
 
-                    var bar = this.CreateHistoryItem(candle);
+                    while (from < to)
+                    {
+                        var trades = this.CheckHitResponse(this.restApi.GetTradesByTimestampAsync(symbol, HitSort.Asc, from, to, MAX_TRADES_BY_REQUEST, cancellationToken: token).Result, out var hitError, true);
 
-                    result.Add(bar);
+                        if (hitError != null || token.IsCancellationRequested)
+                            break;
+
+                        hitTrades.AddRange(trades);
+
+                        if (trades.Length < MAX_TRADES_BY_REQUEST)
+                            break;
+
+                        from = trades.Last().Timestamp;
+                    }
+
+                    long prevTimeTicks = 0;
+                    long prevTradeId = 0;
+                    foreach (var hitTrade in hitTrades)
+                    {
+                        if (token.IsCancellationRequested)
+                            break;
+
+                        if (hitTrade.Id <= prevTradeId)
+                            continue;
+
+                        prevTradeId = hitTrade.Id;
+
+                        var last = this.CreateHistoryItem(hitTrade);
+
+                        if (last.TicksLeft <= prevTimeTicks)
+                            last.TicksLeft = prevTimeTicks + 1;
+
+                        prevTimeTicks = last.TicksLeft;
+
+                        result.Add(last);
+                    }
+
+                    return result;
                 }
-            }
-        }
 
-        return result;
+            case HistoryAggregationTime historyAggregationTime:
+                {
+                    var result = new List<IHistoryItem>();
+
+                    var hitPeriod = this.ConvertPeriod(historyAggregationTime.Period);
+
+                    var intervals = requestParameters.Interval.Split(TimeSpan.FromTicks(historyAggregationTime.Period.Ticks * MAX_TRADES_BY_REQUEST));
+
+                    foreach (var interval in intervals)
+                    {
+                        var candles = this.CheckHitResponse(this.restApi.GetCandlesAsync(symbol, interval.From, interval.To, hitPeriod, MAX_TRADES_BY_REQUEST, token).Result, out _, true);
+
+                        if (candles == null)
+                            return null;
+
+                        foreach (var candle in candles)
+                        {
+                            if (token.IsCancellationRequested)
+                                break;
+
+                            if (candle.Timestamp < from || candle.Timestamp > to)
+                                continue;
+
+                            var bar = this.CreateHistoryItem(candle);
+
+                            result.Add(bar);
+                        }
+                    }
+
+                    return result;
+                }
+
+            default:
+                return new List<IHistoryItem>();
+        }
     }
     #endregion History
 
@@ -597,7 +620,7 @@ internal class MarketDataVendor : Vendor
 
         if (hitError != null && pushDealTicketOnError)
         {
-            var dealTicket = DealTicketGenerator.CreateRefuseDealTicket(hitError.Format());
+            var dealTicket = MessageDealTicket.CreateRefuseDealTicket(hitError.Format());
 
             this.PushMessage(dealTicket);
         }
@@ -611,7 +634,7 @@ internal class MarketDataVendor : Vendor
     {
         if (e.SocketError != null)
         {
-            this.PushMessage(DealTicketGenerator.CreateRefuseDealTicket(e.SocketError.Message));
+            this.PushMessage(MessageDealTicket.CreateRefuseDealTicket(e.SocketError.Message));
             Core.Instance.Loggers.Log(e.SocketError);
             return;
         }
@@ -623,7 +646,7 @@ internal class MarketDataVendor : Vendor
     {
         if (e.SocketError != null)
         {
-            var dealTicket = DealTicketGenerator.CreateRefuseDealTicket(e.SocketError.Message);
+            var dealTicket = MessageDealTicket.CreateRefuseDealTicket(e.SocketError.Message);
             this.PushMessage(dealTicket);
         }
     }

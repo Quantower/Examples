@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using HitBTC.Net;
 using HitBTC.Net.Communication;
@@ -837,7 +837,7 @@ internal class TradingVendor : MarketDataVendor
             }
             else
             {
-                var dealTicket = DealTicketGenerator.CreateRefuseDealTicket(error.ToString());
+                var dealTicket = MessageDealTicket.CreateRefuseDealTicket(error.ToString());
 
                 this.PushMessage(dealTicket);
             }
@@ -865,15 +865,12 @@ internal class TradingVendor : MarketDataVendor
                     var messages = new List<Message>();
 
                     MessageOpenOrder openOrder = null;
-                    MessageOrderHistory orderHistory = null;
-
                     var reportType = e.Report.ReportType;
 
                     if (reportType == HitReportType.New || reportType == HitReportType.Replaced || reportType == HitReportType.Suspended)
                     {
                         messages.Add(openOrder = this.CreateOpenOrder(e.Report));
-                        messages.Add(orderHistory = new MessageOrderHistory(openOrder));
-                        messages.Add(DealTicketGenerator.CreateTradingDealTicket(orderHistory));
+                        messages.Add(new MessageOrderHistory(openOrder));
 
                         if (reportType == HitReportType.Replaced)
                         {
@@ -886,8 +883,7 @@ internal class TradingVendor : MarketDataVendor
                     else
                     {
                         messages.Add(this.CreateCloseOrder(e.Report));
-                        messages.Add(orderHistory = this.CreateOrderHistory(e.Report));
-                        messages.Add(DealTicketGenerator.CreateTradingDealTicket(orderHistory));
+                        messages.Add(this.CreateOrderHistory(e.Report));
 
                         this.ordersCache.Remove(e.Report.ClientOrderId);
 
