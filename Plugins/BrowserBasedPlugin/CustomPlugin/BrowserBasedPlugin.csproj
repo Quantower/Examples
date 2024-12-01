@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <BaseOutputPath>D:\QuantowerVersions\Quantower\TradingPlatform\v1.124.7\bin\plug-ins\WebBrowserBased</BaseOutputPath>
+    <TargetFramework>net8</TargetFramework>
+    <BaseOutputPath></BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,12 +15,10 @@
 
   <ItemGroup>
     <Reference Include="TradingPlatform.BusinessLayer">
-      <HintPath>..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.124.7\bin\TradingPlatform.BusinessLayer.dll</HintPath>
-      <CopyLocal>False</CopyLocal>
+      <HintPath>..\..\..\..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.141.15\bin\TradingPlatform.BusinessLayer.dll</HintPath>
     </Reference>
     <Reference Include="TradingPlatform.PresentationLayer.Plugins">
-      <HintPath>..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.124.7\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
-      <CopyLocal>False</CopyLocal>
+      <HintPath>..\..\..\..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.141.15\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
     </Reference>
   </ItemGroup>
 

@@ -4,6 +4,7 @@ using TradingPlatform.BusinessLayer.Native;
 using TradingPlatform.PresentationLayer.Plugins;
 using TradingPlatform.PresentationLayer.Renderers;
 using System.Linq;
+using System;
 
 namespace GDIBasedPlugin
 {
@@ -27,7 +28,7 @@ namespace GDIBasedPlugin
 
             //
             this.Color = Color.Black;
-            this.bufferedGraphic = new BufferedGraphic(this.Draw, this.Refresh, native.DisposeImage, native.IsDisplayed);
+            this.bufferedGraphic = new BufferedGraphic(this.Draw, this.Refresh, native.DisposeImage, native.IsDisplayed, BufferedGraphicRequiredThreadType.LowPriority);
         }
 
         public void RedrawBufferedGraphic()
@@ -57,7 +58,7 @@ namespace GDIBasedPlugin
             }
         }
 
-        public override object Render() => bufferedGraphic.CurrentImage;
+        public override IntPtr Render() => bufferedGraphic.CurrentImage;
 
         public override void Dispose()
         {

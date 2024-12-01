@@ -1,19 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net8</TargetFramework>
+    <BaseOutputPath></BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" Version="5.0.2" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="TradingPlatform.BusinessLayer">
-      <HintPath>D:\QuantowerVersions\Quantower\TradingPlatform\v1.116.1\bin\TradingPlatform.BusinessLayer.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.141.15\bin\TradingPlatform.BusinessLayer.dll</HintPath>
     </Reference>
     <Reference Include="TradingPlatform.PresentationLayer.Plugins">
-      <HintPath>D:\QuantowerVersions\Quantower\TradingPlatform\v1.116.1\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\QuantowerVersions\Quantower\TradingPlatform\v1.141.15\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
     </Reference>
   </ItemGroup>
 
