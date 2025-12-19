@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BaseOutputPath>D:\QuantowerVersions\Quantower\Settings\Scripts\plug-ins\OrderHistoryUsingExternalSourcePanel</BaseOutputPath>
+    <LangVersion>latest</LangVersion>    
+    <Platforms>AnyCPU;x64</Platforms>    
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="TradingPlatform.BusinessLayer">
+      <HintPath>D:\QuantowerVersions\Quantower\TradingPlatform\v1.145.11\bin\TradingPlatform.BusinessLayer.dll</HintPath>
+    </Reference>
+    <Reference Include="TradingPlatform.PresentationLayer.Plugins">
+      <HintPath>D:\QuantowerVersions\Quantower\TradingPlatform\v1.145.11\bin\TradingPlatform.PresentationLayer.Plugins.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
