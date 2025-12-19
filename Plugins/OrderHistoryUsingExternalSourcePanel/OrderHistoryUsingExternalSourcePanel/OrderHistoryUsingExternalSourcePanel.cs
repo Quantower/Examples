@@ -46,7 +46,10 @@ namespace OrderHistoryUsingExternalSourcePanel
                     Text = "Path to CSV file"
                 });
 
-                settings.Add(new SettingItemString(DataSeparator, this.DataSeparator));
+                settings.Add(new SettingItemString("DataSeparator", this.DataSeparator) 
+                {
+                    Text = "Data separator"
+                });
 
                 return settings;
             }
@@ -93,10 +96,19 @@ namespace OrderHistoryUsingExternalSourcePanel
 
             try
             {
+                this.table.SaveGroupsState();
+                this.table.SuspendDrawing = true;
+                this.table.ClearAll();
+
                 var lines = File.ReadAllLines(this.PathToCSV);
 
                 foreach (var line in lines)
                     this.table.AddItem(new OrderHistoryUsingExternalSourceTableItem(line.Split(this.DataSeparator)));
+
+                this.table.Regroup();
+                this.table.SuspendDrawing = false;
+
+                this.table.Resort();
             }
             catch (Exception ex)
             {

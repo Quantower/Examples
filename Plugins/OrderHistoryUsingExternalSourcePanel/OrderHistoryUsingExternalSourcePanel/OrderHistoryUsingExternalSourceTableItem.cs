@@ -24,7 +24,7 @@ namespace OrderHistoryUsingExternalSourcePanel
             new TableColumnDefinition(loc.key("Symbol"), TableComparingType.String){ AllowGrouping = true},
             new TableColumnDefinition(loc.key("Side"), TableComparingType.String) { AllowGrouping = true},
             new TableColumnDefinition(loc.key("Order type"), TableComparingType.String) {  AllowGrouping = true},
-            new TableColumnDefinition(loc.key("Quantity"), TableComparingType.Double) {AllowGrouping = false},
+            new TableColumnDefinition(loc.key("Quantity"), TableComparingType.Double) {AllowGrouping = false, },
             new TableColumnDefinition(loc.key("Price"), TableComparingType.Double) {AllowGrouping = false},
             new TableColumnDefinition(loc.key("Trigger Price"), TableComparingType.Double) { AllowGrouping = false },
             new TableColumnDefinition(loc.key("Tiff"), TableComparingType.String) {AllowGrouping = true},
