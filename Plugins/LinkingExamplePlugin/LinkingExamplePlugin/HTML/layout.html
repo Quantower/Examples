@@ -1,0 +1,55 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Login V10</title>
+	<meta charset="UTF-8">
+    <link rel="stylesheet" href="../../../themes/default/css/colors.css"/>
+    <link rel="stylesheet" href="../../../themes/default/css/core.css" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<script>
+
+		(async function () {
+            await CefSharp.BindObjectAsync("bound");
+		})();
+
+		function JSFunction(text) {
+			document.getElementById('usernametextbox').value = text;
+            document.getElementById('passwordtextbox').value = text;
+        }
+    </script>
+</head>
+<body>
+   <panel class="autoHeight shadow" style="width:420px" id="panel">
+	   <panelHeader draggable="true">
+		   <panelTitle id="window_title">
+			   <linker id="linker">
+				   <icon class="link"></icon>
+			   </linker>
+			   <panelTitleText id="window_title_text">An example</panelTitleText>
+		   </panelTitle>
+		   <panelControls>
+			   <icon id="window_close" class="close"></icon>
+		   </panelControls>
+	   </panelHeader>
+		<panelBody>
+			<div class="limiter">
+			<div class="container-login100">
+				<div class="wrap-login100 p-t-50 p-b-90">
+					<div>					
+						<div>
+							<input id ="symboltextbox" type="text" name="username" disabled="disabled">						
+						</div>					
+						<div>
+							<button id="symbollookupbutton" class="login100-form-btn">
+								Select symbol
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</panelBody>
+  </panel>
+
+</body>
+</html>
